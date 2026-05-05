@@ -38,16 +38,6 @@ export interface InputProps {
 	mono?: boolean;
 }
 
-export interface OrganizationData {
-    name: string;
-    numUsers: number;
-    numAssets: number;
-}
-
-export interface DashboardData {
-    organizationData: OrganizationData;
-}
-
 export const inputBase = `
 	w-full bg-surface border rounded-sm px-6 py-7
 	text-text outline-none

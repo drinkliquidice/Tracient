@@ -1,6 +1,5 @@
 from __future__ import annotations
 import csv
-from bson.objectid import ObjectId
 from io import StringIO
 from fastapi import UploadFile, File, Form
 from pymongo.errors import DuplicateKeyError
@@ -8,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from src.admin.datadef import AdminUser
 from src.users.datadef import MemberUser
 from src.database.mongodb import mongo
-from src.organizations.datadef import OrgnanizationDocument
+from src.organizations.datadef import OrganizationDocument
 
 
 class NewOrganizationForm:
@@ -34,7 +33,7 @@ async def parse_csv_and_add_users(csv_bytes: bytes) -> list[str]:
         members.append(member)
     
     await MemberUser.insert_many(members)
-    return [str(m.id) for m in members]
+    return [m.id for m in members]
 
 
 async def create_new_organization(admin: AdminUser, form: NewOrganizationForm) -> None:
@@ -42,9 +41,9 @@ async def create_new_organization(admin: AdminUser, form: NewOrganizationForm) -
     member_ids = await parse_csv_and_add_users(csv_bytes)
  
     try:
-        org_doc = await OrgnanizationDocument(
+        org_doc = await OrganizationDocument(
             name=form.name,
-            admin_users=[str(admin.id)],
+            admin_users=[admin.id],
             members=member_ids,
             assets=[],
         ).insert()
@@ -54,7 +53,11 @@ async def create_new_organization(admin: AdminUser, form: NewOrganizationForm) -
         raise RuntimeError(f"Failed to create organization: {e}")
     
     try:
-        await AdminUser.find_one(AdminUser.id == admin.id).update({"$set": {"organizations": org_doc.id}})  
+        admin_collection = mongo["admin_users"]
+        await admin_collection.update_one(
+            {"_id": admin.id},
+            {"$set": {"organizations": org_doc.id}}
+        )
     except Exception as e:
-        await mongo["organizations"].delete_one({"_id": ObjectId(org_doc.id)})
+        await mongo["organizations"].delete_one({"_id": org_doc.id})
         raise RuntimeError(f"Failed to add organization to user: {e}")

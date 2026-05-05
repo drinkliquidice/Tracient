@@ -1,12 +1,12 @@
 from beanie import Document
-from pydantic import BaseModel
+from utils import PyObjectId
 
 
-class OrgnanizationDocument(Document):
+class OrganizationDocument(Document):
     name: str
-    admin_users: list[str]
-    members: list[str]
-    assets: list[str]
+    admin_users: list[PyObjectId]
+    members: list[PyObjectId]
+    assets: list[PyObjectId]
     
 
     class Settings:

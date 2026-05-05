@@ -1,13 +1,14 @@
-import { Component, createResource, createSignal, Match, onMount, Switch } from 'solid-js';
-import { createStore } from 'solid-js/store';
+import { Component, createResource, Match, Switch } from 'solid-js';
 
 
 import { backendRequest, getToken, logout } from '@/functional/utils';
-import { DashboardData, OrganizationData } from './functional/types';
-import { _mergeSearchString } from '@solidjs/router';
-import { fetchUser } from '@/functional/auth';
+import { OrganizationInterfaceData, OrganizationMemberData} from '@/admin/organizations/functional/types';
+import { DashboardBody } from './organizations/interface';
+import { _mergeSearchString, useNavigate } from '@solidjs/router';
 
-const HeaderCard: Component = (props) => (
+const HeaderCard: Component<{
+    navigateLogin: () => void;
+}> = (props) => (
     <div class="w-full h-20 bg-accent overflow-hidden flex items-center justify-between relative px-2">
         {/* Dot grid */}
         <div class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18] pointer-events-none" aria-hidden="true">
@@ -36,7 +37,7 @@ const HeaderCard: Component = (props) => (
             <div class="w-px h-4 bg-text/15" />
             <span 
                 class="font-mono text-l tracking-[0.15em] text-text/60 hover:text-text transition-colors cursor-pointer"
-                onClick={() => { logout(); navigate('/login'); }}
+                onClick={() => { logout(); props.navigateLogin(); }}
             >
                 LOG OUT
             </span>
@@ -44,15 +45,6 @@ const HeaderCard: Component = (props) => (
 
     </div>
 );
-
-const DashboardBody: Component<{
-    data: DashboardData;
-}> = (props) => {
-    return (
-        <div class="flex-1 p-10">
-        </div>
-    )
-}
 
 const NoOrganizationView: Component = () => (
     <div class="flex-1 flex flex-col items-center justify-center gap-3">
@@ -66,6 +58,8 @@ const NoOrganizationView: Component = () => (
 
 
 const DashboardPage: Component = () => {
+    const navigate = useNavigate();
+    const navigateLogin = () => navigate('/login/');
     const tok = getToken();
     console.log('tok:', tok); 
 
@@ -76,13 +70,13 @@ const DashboardPage: Component = () => {
     const [pageData] = createResource(
         async () => {
             console.log('Fetching dashboard with token:', tok);
-            return await backendRequest<DashboardData>('GET', '/api/admin/dashboard', tok!);
+            return await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok!);
         }
     );
 
     return (
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
-            <HeaderCard />
+            <HeaderCard navigateLogin={navigateLogin} />
             <Switch>
                 <Match when={pageData.loading}>
                     <div class="flex-1 flex items-center justify-center">

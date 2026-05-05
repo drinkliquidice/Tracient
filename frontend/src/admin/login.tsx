@@ -6,7 +6,7 @@ import {
     LoginForm,
     LoginErrors,
     InputProps,
-    inputBase
+    inputBase,
 } from '@/admin/functional/types';
 import { backendRequest, saveToken} from '@/functional/utils';
 

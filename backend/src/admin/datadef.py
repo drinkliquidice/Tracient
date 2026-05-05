@@ -1,4 +1,5 @@
 from beanie import Document
+from utils import PyObjectId
 
 
 class AdminUser(Document):
@@ -6,7 +7,7 @@ class AdminUser(Document):
     password: str
     first_name: str
     last_name: str
-    organization: str | None = None
+    organization: PyObjectId | None = None
 
     class Settings:
         name = "adminUsers"

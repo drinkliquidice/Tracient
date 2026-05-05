@@ -5,7 +5,9 @@ class Settings(BaseSettings):
 
     MONGODB_URI: str = ""
     TRACIENT_URL: str = "https://tracient.ca"
-    TWILIO_API_KEY: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_NUMBER: str = ""
 
     SECRET_KEY: str = ""
     ALGORITHM: str = ""
