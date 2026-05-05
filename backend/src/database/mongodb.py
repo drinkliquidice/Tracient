@@ -1,19 +1,19 @@
-from dotenv import load_dotenv
-import os
-
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.server_api import ServerApi
 
-load_dotenv()
+from settings import settings
 
-database_url = os.getenv("DATABASE_URI")
+database_url = settings.MONGODB_URI
 
-# Create a new client and connect to the server
-client = AsyncIOMotorClient(database_url, server_api=ServerApi('1'))
+client = AsyncIOMotorClient(
+    database_url,
+    tlsCAFile=certifi.where(),
+)
+mongo = client.get_default_database()
 
-# Send a ping to confirm a successful connection
-try:
-    client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
-except Exception as e:
-    print(e)
+async def set_up_mongo():
+    try:
+        await client.admin.command('ping')
+        print("Pinged your deployment. You successfully connected to MongoDB!")
+    except Exception as e:
+        print(e)

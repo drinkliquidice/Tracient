@@ -1,0 +1,26 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from beanie import init_beanie
+from src.admin.datadef import AdminUser
+from src.api.auth import auth_router
+from src.api.pages.admin import admin_pages_router
+from src.api.actions.organizations import organizations_actions_router
+from src.database.mongodb import mongo, set_up_mongo
+from src.organizations.datadef import OrgnanizationDocument
+from src.users.datadef import MemberUser
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_beanie(
+        database=mongo, #type: ignore
+        document_models=[AdminUser, OrgnanizationDocument, MemberUser]
+    )
+    print("Beanie initialized!")
+    await set_up_mongo()
+    await mongo["adminUsers"].create_index("username", unique=True)
+    yield
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(auth_router)
+app.include_router(admin_pages_router)
+app.include_router(organizations_actions_router)

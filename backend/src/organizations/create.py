@@ -1,0 +1,60 @@
+from __future__ import annotations
+import csv
+from bson.objectid import ObjectId
+from io import StringIO
+from fastapi import UploadFile, File, Form
+from pymongo.errors import DuplicateKeyError
+
+from src.admin.datadef import AdminUser
+from src.users.datadef import MemberUser
+from src.database.mongodb import mongo
+from src.organizations.datadef import OrgnanizationDocument
+
+
+class NewOrganizationForm:
+    def __init__(
+        self,
+        name: str = Form(..., min_length=2, max_length=100),
+        members_csv: UploadFile = File(...),
+    ):
+        self.name = name
+        self.members_csv = members_csv
+
+
+async def parse_csv_and_add_users(csv_bytes: bytes) -> list[str]:
+    member_csv_data = StringIO(csv_bytes.decode('utf-8'))
+    reader = csv.DictReader(member_csv_data)
+    members: list[MemberUser] = []
+    for row in reader:
+        member = MemberUser.assemble(
+            name = row["name"],
+            contact_name = row["contact_name"],
+            contact_number = row["contact_number"]
+        )
+        members.append(member)
+    
+    await MemberUser.insert_many(members)
+    return [str(m.id) for m in members]
+
+
+async def create_new_organization(admin: AdminUser, form: NewOrganizationForm) -> None:
+    csv_bytes = await form.members_csv.read()
+    member_ids = await parse_csv_and_add_users(csv_bytes)
+ 
+    try:
+        org_doc = await OrgnanizationDocument(
+            name=form.name,
+            admin_users=[str(admin.id)],
+            members=member_ids,
+            assets=[],
+        ).insert()
+    except DuplicateKeyError:
+        raise RuntimeError("Organization name already taken")
+    except Exception as e:
+        raise RuntimeError(f"Failed to create organization: {e}")
+    
+    try:
+        await AdminUser.find_one(AdminUser.id == admin.id).update({"$set": {"organizations": org_doc.id}})  
+    except Exception as e:
+        await mongo["organizations"].delete_one({"_id": ObjectId(org_doc.id)})
+        raise RuntimeError(f"Failed to add organization to user: {e}")

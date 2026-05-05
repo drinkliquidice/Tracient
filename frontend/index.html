@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="robots" content="noindex, nofollow" />
+        <meta
+            name="description"
+            content="TRACIENT admin sign up page for creating new admin accounts"
+        />
+        <title>TRACIENT | Admin Sign Up</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+            html, body { height: 100%; }
+            body {
+                background: #0d0d0d;
+                overflow-x: hidden;
+            }
+            #app {
+                min-height: 100vh;
+            }
+        </style>
+        <script type="module">
+            import { mountApp } from './src/main.tsx';
+            mountApp();
+        </script>
+    </head>
+    <body>
+        <div id="app"></div>
+    </body> 
+</html>

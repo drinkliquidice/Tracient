@@ -6,6 +6,8 @@ class AdminUser(Document):
     password: str
     first_name: str
     last_name: str
+    organization: str | None = None
 
     class Settings:
-        name = "admin_users"
+        name = "adminUsers"
+
