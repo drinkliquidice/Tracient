@@ -29,7 +29,8 @@ app.include_router(organizations_actions_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://e10fa18e.tracient.pages.dev/",
+        "https://tracient.pages.dev",
+        "https://e10fa18e.tracient.pages.dev",
     ],
     allow_credentials=True,
     allow_methods=["*"],
