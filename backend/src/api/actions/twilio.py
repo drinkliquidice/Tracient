@@ -52,7 +52,8 @@ async def member_tap(member_id: str):
             f"Hi {member.contact_name}, {member.name} has signed OUT at {timestamp}."
         )
 
-    send_sms(to=member.contact_number, body=message)
+    if member.use_contact:
+        send_sms(to=member.contact_number, body=message)
 
     return {
         "member": member.name,

@@ -96,6 +96,7 @@ const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData)
     const [name, setName] = createSignal('');
     const [contactName, setContactName] = createSignal('');
     const [contactNumber, setContactNumber] = createSignal('');
+    const [useContact, setUseContact] = createSignal(false);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal('');
     const [success, setSuccess] = createSignal(false);
@@ -114,6 +115,7 @@ const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData)
                 orgId: props.orgId,
                 contactName: contactName().trim(),
                 contactNumber: contactNumber().trim(),
+                useContact: useContact(),
             });
             setName('');
             setContactName('');
@@ -160,6 +162,33 @@ const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData)
                 />
             </div>
 
+            <div class="flex items-center gap-3">
+                <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={useContact()}
+                    class="w-4 h-4 rounded-sm border border-text/20 flex items-center justify-center transition-colors"
+                    classList={{
+                        'bg-accent border-accent': useContact(),
+                        'bg-transparent': !useContact(),
+                    }}
+                    onClick={() => setUseContact(v => !v)}
+                    disabled={loading()}
+                >
+                    {useContact() && (
+                        <svg class="w-3 h-3 text-text" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    )}
+                </button>
+                <label
+                    class="font-mono text-xs tracking-widest text-text/40 uppercase cursor-pointer select-none"
+                    onClick={() => setUseContact(v => !v)}
+                >
+                    Send SMS notifications
+                </label>
+            </div>
+
             {error() && (
                 <p class="font-mono text-xs text-red-400/80 tracking-wide">{error()}</p>
             )}
@@ -191,6 +220,7 @@ export const DashboardBody: Component<{ data: OrganizationInterfaceData }> = (pr
             name: data.name,
             contact_name: data.contactName,
             contact_number: data.contactNumber,
+            use_contact: data.useContact,
         });
     };
 

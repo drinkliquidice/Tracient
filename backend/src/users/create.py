@@ -16,12 +16,14 @@ class NewMemberForm(APIRequestModel):
     name: str
     contact_name: str
     contact_number: str
+    use_contact: bool
 
     def create_document(self) -> MemberUser:
         return MemberUser.assemble(
             name=self.name,
             contact_name=self.contact_name,
             contact_number=self.contact_number,
+            use_contact=self.use_contact,
         )
 
 

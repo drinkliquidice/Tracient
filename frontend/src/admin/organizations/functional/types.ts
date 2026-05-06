@@ -17,6 +17,7 @@ export interface AddMemberFormData {
     orgId: string;
     contactName: string;
     contactNumber: string;
+    useContact: boolean;
 }
 
 export const inputBase = `
