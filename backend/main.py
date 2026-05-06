@@ -27,7 +27,6 @@ app.include_router(auth_router)
 app.include_router(admin_pages_router)
 app.include_router(organizations_actions_router)
 app.include_router(twilio_actions_router)
-# backend/main.py
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -38,3 +37,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
