@@ -4,14 +4,14 @@ from datetime import datetime
 from fastapi import HTTPException
 from http import HTTPStatus
 
-from utils import APIRequestModel
+from utils import APIResponseModel
 from src.database.mongodb import mongo
 from src.admin.datadef import AdminUser
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
     
 
-class OrganizationMemberData(APIRequestModel):
+class OrganizationMemberData(APIResponseModel):
     id: str
     name: str
     contact_name: str
@@ -23,7 +23,7 @@ class OrganizationMemberData(APIRequestModel):
     endpoint: str
 
 
-class OrganizationInterfaceData(APIRequestModel):
+class OrganizationInterfaceData(APIResponseModel):
     name: str
     id: str
     users: list[OrganizationMemberData]
