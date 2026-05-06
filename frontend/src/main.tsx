@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('@/admin/login'));
 const DashboardPage = lazy(() => import('@/admin/dashboard'));
 const CreateOrganizationPage = lazy(() => import('@/admin/organizations/create'));
 const MemberTapPage = lazy(() => import('@/user/index'));
+const SignInPage = lazy(() => import('@/admin/organizations/signin'));
 
 const AuthWrapper: ParentComponent = (props) => {
     const navigate = useNavigate();
@@ -35,6 +36,7 @@ export const mountApp = () =>
                     <Route path="/dashboard" component={DashboardPage} />
                     <Route path="/organization/create" component={CreateOrganizationPage} />
                     <Route path="/member/:id" component={MemberTapPage} /> 
+                    <Route path="/signin" component={SignInPage} /> 
                 </Route>
             </Router>
         ),

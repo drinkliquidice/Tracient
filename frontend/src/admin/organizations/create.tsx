@@ -39,7 +39,7 @@ export const inputBase = `
 
 // ── api ──────────────────────────────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5173';
 
 async function createOrganization(token: string, name: string, csvFile: File): Promise<void> {
     const formData = new FormData();

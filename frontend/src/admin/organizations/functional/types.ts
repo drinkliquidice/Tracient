@@ -24,6 +24,12 @@ export interface AddMemberFormData {
     useContact: boolean;
 }
 
+export interface SignInResponse {
+    member: string;
+    action: string;
+    timestamp: string;
+}
+
 export const inputBase = `
 	w-full bg-surface border rounded-sm px-6 py-7
 	text-text outline-none

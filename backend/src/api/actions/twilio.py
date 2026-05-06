@@ -1,5 +1,4 @@
-# routers/member.py
-from datetime import datetime, timezone
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from http import HTTPStatus
 from beanie.odm.fields import PydanticObjectId
