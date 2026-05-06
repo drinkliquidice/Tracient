@@ -75,11 +75,11 @@ const QRCodeReader: Component<{
     });
 
     return (
-        <div class="w-72 h-72 justify-center">
+        <div class="w-96 justify-center">
             <Show when={error()}>
                 <p>{error()}</p>
             </Show>
-            <video ref={videoRef} class="w-full h-full rounded" />
+            <video ref={videoRef} class="w-full h-auto rounded" />
         </div>
     );
 
@@ -105,7 +105,6 @@ export const SignInPage: Component = () => {
     const [result] = createResource(
         endpointUrl,
         async (url) => {
-            console.log("fetcher called with:", url);
             if (!url) return null;
             return await backendRequest<SignInResponse>('GET', `/member/${url}`, tok!);
         }
@@ -115,15 +114,17 @@ export const SignInPage: Component = () => {
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
             <HeaderCard navigateLogin={navigateLogin} />
             <div class="flex flex-1 items-center justify-center">
-                <QRCodeReader onScan={onScan} />
-            </div>
-            <Show when={result()}>
-                <div class="mt-6 p-4 bg-green-100 text-green-800 rounded">
-                    <p class="font-bold">{result()!.member}</p>
-                    <p>{result()!.action} at {new Date(result()!.timestamp).toLocaleTimeString()}</p>
+                <div class="flex flex-col items-center gap-4">
+                    <QRCodeReader onScan={onScan} />
+                    <Show when={result()}>
+                        <div class="p-6 mx-4 bg-green-100 text-green-800 rounded inline-block">
+                            <p class="font-bold">{result()!.member}</p>
+                            <p>{result()!.action} at {new Date(result()!.timestamp).toLocaleTimeString()}</p>
+                        </div>
+                    </Show>
                 </div>
-            </Show>
-        </div>   
+            </div>
+        </div>  
     );
 };
 
