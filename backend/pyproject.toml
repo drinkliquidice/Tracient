@@ -10,6 +10,7 @@ dependencies = [
     "motor==3.3.2",
     "beanie==1.25.0",
     "twilio",
+    "python-multipart"
     "pydantic",
     "python-dotenv",
     "pydantic-settings",
