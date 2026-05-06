@@ -5,9 +5,11 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
+    "gunicorn",
     "pymongo==4.6.3",
     "motor==3.3.2",
     "beanie==1.25.0",
+    "twilio",
     "pydantic",
     "python-dotenv",
     "pydantic-settings",
