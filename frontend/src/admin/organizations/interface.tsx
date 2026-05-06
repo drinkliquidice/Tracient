@@ -2,7 +2,66 @@ import { backendRequest, getToken } from "@/functional/utils";
 import { Component, createSignal } from "solid-js";
 import { inputBase, AddMemberFormData, OrganizationInterfaceData, OrganizationMemberData } from "./functional/types";
 
-const MemberCard: Component<{ member: OrganizationMemberData }> = (props) => {
+const QRModal: Component<{ member: OrganizationMemberData; onClose: () => void }> = (props) => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(props.member.endpoint)}`;
+
+    // Close on backdrop click
+    const handleBackdrop = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).dataset.backdrop) props.onClose();
+    };
+
+    return (
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            data-backdrop="true"
+            onClick={handleBackdrop}
+        >
+            <div class="flex flex-col items-center gap-5 bg-surface border border-text/10 rounded-sm p-8 shadow-2xl min-w-[320px]">
+                {/* Header */}
+                <div class="flex w-full items-center justify-between">
+                    <span class="font-mono font-bold text-sm tracking-widest text-text uppercase">
+                        {props.member.name}
+                    </span>
+                    <button
+                        class="font-mono text-xs tracking-widest text-text/40 hover:text-text transition-colors uppercase"
+                        onClick={props.onClose}
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div class="h-px w-full bg-text/8" />
+
+                {/* QR Code — fetched from qrserver.com, no library needed */}
+                <div class="p-3 bg-white rounded-sm">
+                    <img
+                        src={qrUrl}
+                        alt={`QR code for ${props.member.name}`}
+                        width={280}
+                        height={280}
+                        class="block"
+                    />
+                </div>
+
+                {/* Endpoint label */}
+                <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center max-w-70">
+                    {props.member.endpoint}
+                </span>
+
+                {/* Download button */}
+                <a
+                    href={qrUrl}
+                    download={`${props.member.name}-qr.png`}
+                    class="w-full py-3 bg-accent text-text font-mono text-sm tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
+                >
+                    Download PNG
+                </a>
+            </div>
+        </div>
+    );
+};
+
+const MemberCard: Component<{ member: OrganizationMemberData; onClick: () => void }> = (props) => {
     const formatDate = (date: Date | null) => {
         if (!date) return 'Never';
         const d = new Date(date);
@@ -10,7 +69,10 @@ const MemberCard: Component<{ member: OrganizationMemberData }> = (props) => {
     };
 
     return (
-        <div class="flex items-center justify-between px-4 py-3 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group">
+        <div
+            class="flex items-center justify-between px-4 py-3 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
+            onClick={props.onClick}
+        >
             <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
                 {props.member.name}
             </span>
@@ -120,10 +182,9 @@ const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData)
     );
 };
 
-export const DashboardBody: Component<{
-    data: OrganizationInterfaceData;
-}> = (props) => {
+export const DashboardBody: Component<{ data: OrganizationInterfaceData }> = (props) => {
     const tok = getToken();
+    const [selectedMember, setSelectedMember] = createSignal<OrganizationMemberData | null>(null);
 
     const handleAddMember = async (data: AddMemberFormData) => {
         await backendRequest('POST', '/api/admin/organization/member/add', tok!, {
@@ -136,6 +197,14 @@ export const DashboardBody: Component<{
 
     return (
         <div class="flex-1 grid grid-cols-2 gap-0 min-h-0 mx-4">
+            {/* QR Modal — rendered at this level so it overlays everything */}
+            {selectedMember() && (
+                <QRModal
+                    member={selectedMember()!}
+                    onClose={() => setSelectedMember(null)}
+                />
+            )}
+
             {/* LEFT — Member list */}
             <div class="flex flex-col py-10 px-4 border-r border-text/8 min-h-0">
                 <h1 class="font-mono font-bold text-3xl tracking-[0.12em] text-text mb-8 uppercase">
@@ -156,7 +225,10 @@ export const DashboardBody: Component<{
                             </div>
                         )
                         : props.data.users.map(member => (
-                            <MemberCard member={member} />
+                            <MemberCard
+                                member={member}
+                                onClick={() => setSelectedMember(member)}
+                            />
                         ))
                     }
                 </div>
@@ -168,7 +240,6 @@ export const DashboardBody: Component<{
                     <h2 class="font-mono font-bold text-xl tracking-[0.12em] text-text uppercase">Add Member</h2>
                     <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Add another user to the organization</p>
                 </div>
-
                 <div class="border border-text/8 rounded-sm p-6 bg-surface">
                     <AddMemberForm orgId={props.data.id} onAdd={handleAddMember} />
                 </div>
