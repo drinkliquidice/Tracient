@@ -184,9 +184,6 @@ const CreateOrganizationBody: Component = () => {
 
     const onSubmit = async (e: Event) => {
         e.preventDefault();
-        console.log('onSubmit fired');
-        console.log('csvFile:', csvFile());
-        console.log('form:', form);
         const errs = validateAll(form);
         if (!csvFile()) errs.csv = 'Members CSV is required';
         setErrors(errs);

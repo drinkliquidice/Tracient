@@ -61,7 +61,6 @@ const DashboardPage: Component = () => {
     const navigate = useNavigate();
     const navigateLogin = () => navigate('/login/');
     const tok = getToken();
-    console.log('tok:', tok); 
 
     if (!tok) {
         window.location.href = '/login';
@@ -69,7 +68,6 @@ const DashboardPage: Component = () => {
 
     const [pageData] = createResource(
         async () => {
-            console.log('Fetching dashboard with token:', tok);
             return await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok!);
         }
     );

@@ -1,8 +1,12 @@
 export interface OrganizationMemberData {
+    id: string
     name: string
+    contactName: string
+    contactNumber: string
+    useContact: boolean
     signInTime: Date | null
     signOutTime: Date | null
-    lastSignIn: Date| null
+    lastSignIn: Date | null
     endpoint: string
 }
 

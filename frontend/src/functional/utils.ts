@@ -4,7 +4,6 @@ export const saveToken = (token: string, refreshToken?: string) => {
 };
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
-console.log('BASE_URL:', BASE_URL);
 export const getToken = () => localStorage.getItem('token');
 export const getRefreshToken = () => localStorage.getItem('refresh_token');
 export const isLoggedIn = () => !!getToken();
@@ -34,8 +33,6 @@ export const backendRequest = async <T>(
     const text = await res.text();
     let data: any;
     try {
-        console.log('Response status:', res.status);
-        console.log('Response body:', text);
         data = JSON.parse(text);
     } catch {
         // Server returned non-JSON (HTML error page, plain text, etc.)
