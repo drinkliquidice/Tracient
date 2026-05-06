@@ -6,6 +6,7 @@ from src.admin.datadef import AdminUser
 from src.api.auth import auth_router
 from src.api.pages.dashboard import admin_pages_router
 from src.api.actions.organizations import organizations_actions_router
+from src.api.actions.twilio import twilio_actions_router
 from src.database.mongodb import mongo, set_up_mongo
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
@@ -25,6 +26,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(admin_pages_router)
 app.include_router(organizations_actions_router)
+app.include_router(twilio_actions_router)
 # backend/main.py
 app.add_middleware(
     CORSMiddleware,

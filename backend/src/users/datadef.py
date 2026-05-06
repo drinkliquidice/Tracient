@@ -23,7 +23,7 @@ class MemberUser(Document):
     @staticmethod
     def assemble(name: str, contact_name: str, contact_number: str, use_contact: bool) -> MemberUser:
         doc_id = PydanticObjectId()
-        member_endpoint = settings.TRACIENT_URL + "/" + str(doc_id)
+        member_endpoint = settings.TRACIENT_URL + "admin/member/" + str(doc_id)
         return MemberUser(
             id=doc_id,
             name=name,
