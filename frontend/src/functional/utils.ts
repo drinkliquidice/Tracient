@@ -3,6 +3,8 @@ export const saveToken = (token: string, refreshToken?: string) => {
     if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
 };
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
+console.log('BASE_URL:', BASE_URL);
 export const getToken = () => localStorage.getItem('token');
 export const getRefreshToken = () => localStorage.getItem('refresh_token');
 export const isLoggedIn = () => !!getToken();
@@ -19,7 +21,7 @@ export const backendRequest = async <T>(
     token: string | null,
     body?: unknown
 ): Promise<T> => {
-    const res = await fetch(path, {
+    const res = await fetch(`${BASE_URL}${path}`, {
         method,
         headers: {
             'Content-Type': 'application/json',
