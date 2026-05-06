@@ -102,13 +102,9 @@ const FormCard: Component = () => {
                 'POST', '/api/admin/login', null,
                 { username: form.username, password: form.password }
             );
-            console.log('Login response:', res);
-            console.log('Token:', res.token);
             saveToken(res.token);
-            console.log('localStorage after save:', localStorage.getItem('token'));
             navigate('/admin/dashboard');
         } catch (err: unknown) {
-            console.log('Login error:', err);  // add this
             setErrors('submit', err instanceof Error ? err.message : 'Invalid username or password');
             setErrors('submit', err instanceof Error ? err.message : 'Invalid username or password');
         } finally {

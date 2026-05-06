@@ -39,12 +39,14 @@ export const inputBase = `
 
 // ── api ──────────────────────────────────────────────────────────────────────
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5173';
+
 async function createOrganization(token: string, name: string, csvFile: File): Promise<void> {
     const formData = new FormData();
     formData.append('name', name);
     formData.append('members_csv', csvFile);
 
-    const res = await fetch('/api/admin/organization/create', {
+    const res = await fetch(`${BASE_URL}/api/admin/organization/create`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -182,9 +184,6 @@ const CreateOrganizationBody: Component = () => {
 
     const onSubmit = async (e: Event) => {
         e.preventDefault();
-        console.log('onSubmit fired');
-        console.log('csvFile:', csvFile());
-        console.log('form:', form);
         const errs = validateAll(form);
         if (!csvFile()) errs.csv = 'Members CSV is required';
         setErrors(errs);

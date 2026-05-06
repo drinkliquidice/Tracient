@@ -3,6 +3,7 @@ export const saveToken = (token: string, refreshToken?: string) => {
     if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
 };
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5173';
 export const getToken = () => localStorage.getItem('token');
 export const getRefreshToken = () => localStorage.getItem('refresh_token');
 export const isLoggedIn = () => !!getToken();
@@ -19,7 +20,7 @@ export const backendRequest = async <T>(
     token: string | null,
     body?: unknown
 ): Promise<T> => {
-    const res = await fetch(path, {
+    const res = await fetch(`${BASE_URL}${path}`, {
         method,
         headers: {
             'Content-Type': 'application/json',
@@ -32,8 +33,6 @@ export const backendRequest = async <T>(
     const text = await res.text();
     let data: any;
     try {
-        console.log('Response status:', res.status);
-        console.log('Response body:', text);
         data = JSON.parse(text);
     } catch {
         // Server returned non-JSON (HTML error page, plain text, etc.)

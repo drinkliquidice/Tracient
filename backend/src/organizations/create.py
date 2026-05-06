@@ -28,7 +28,8 @@ async def parse_csv_and_add_users(csv_bytes: bytes) -> list[str]:
         member = MemberUser.assemble(
             name = row["name"],
             contact_name = row["contact_name"],
-            contact_number = row["contact_number"]
+            contact_number = row["contact_number"],
+            use_contact= row.get("use_contact", "false").lower() == "true",
         )
         members.append(member)
     

@@ -4,6 +4,7 @@ from auth import get_current_user
 from src.admin.datadef import AdminUser
 from src.organizations.create import NewOrganizationForm, create_new_organization
 from src.users.create import NewMemberForm, create_new_member
+from src.users.update import UpdateMemberForm, update_member
 
 organizations_actions_router = APIRouter(prefix="/api/admin/organization")
 
@@ -21,3 +22,10 @@ async def add_member_to_organization(
     admin: AdminUser = Depends(get_current_user),
 ) -> None:
     await create_new_member(form)
+
+@organizations_actions_router.patch("/member/update")
+async def update_organization_member(
+    form: UpdateMemberForm,
+    admin: AdminUser = Depends(get_current_user),
+) -> None:
+    await update_member(form)
