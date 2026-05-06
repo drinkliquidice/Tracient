@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from http import HTTPStatus
 from beanie.odm.fields import PydanticObjectId
+from zoneinfo import ZoneInfo
 
 from src.users.datadef import MemberUser
 from src.notifs.twillo import send_sms
@@ -16,7 +17,7 @@ async def member_tap(member_id: str):
     if not member:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail="Member not found")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(ZoneInfo("America/New_York"))
     action: str
 
     sign_in = member.sign_in_time
