@@ -32,7 +32,6 @@ const QRModal: Component<{ member: OrganizationMemberData; onClose: () => void }
 
                 <div class="h-px w-full bg-text/8" />
 
-                {/* QR Code — fetched from qrserver.com, no library needed */}
                 <div class="p-3 bg-white rounded-sm">
                     <img
                         src={qrUrl}
