@@ -1,10 +1,10 @@
 from __future__ import annotations
 from datetime import datetime 
 
-from beanie import Document
-from beanie.odm.fields import PydanticObjectId
+from beanie import Document, PydanticObjectId
 
 from settings import settings
+from utils import PyObjectId
 
 
 class MemberUser(Document):
@@ -12,6 +12,7 @@ class MemberUser(Document):
     contact_name: str
     contact_number: str
     endpoint: str
+    assets: list[PyObjectId] = []
     use_contact: bool = False
     sign_in_time: datetime | None = None
     sign_out_time: datetime | None = None
@@ -34,4 +35,5 @@ class MemberUser(Document):
             sign_out_time=None,
             last_signed_in=None,
             use_contact=use_contact,
+            assets=[],
         )

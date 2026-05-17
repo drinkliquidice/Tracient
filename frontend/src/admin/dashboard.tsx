@@ -1,8 +1,8 @@
-import { Component, createResource, Match, Switch } from 'solid-js';
+import { Component, createEffect, createResource, Match, Switch } from 'solid-js';
 
 
 import { backendRequest, getToken, logout } from '@/functional/utils';
-import { OrganizationInterfaceData, OrganizationMemberData} from '@/admin/organizations/functional/types';
+import { OrganizationInterfaceData} from '@/admin/organizations/functional/types';
 import { DashboardBody } from './organizations/interface';
 import { _mergeSearchString, useNavigate } from '@solidjs/router';
 
@@ -60,11 +60,17 @@ const NoOrganizationView: Component = () => (
 const DashboardPage: Component = () => {
     const navigate = useNavigate();
     const navigateLogin = () => navigate('/login/');
-    const tok = getToken();
+    const tok = getToken(); 
 
     if (!tok) {
         window.location.href = '/login';
     }
+
+    createEffect(() => {
+        if ((pageData.error as any)?.status === 401) {
+            navigateLogin();
+        }
+    });
 
     const [pageData] = createResource(
         async () => {
@@ -85,7 +91,6 @@ const DashboardPage: Component = () => {
                 <Match when={(pageData.error as any)?.status === 412}>
                     <NoOrganizationView />
                 </Match>
-
                 <Match when={pageData()}>
                     <DashboardBody data={pageData()!} />
                 </Match>
