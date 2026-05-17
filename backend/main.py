@@ -5,17 +5,19 @@ from beanie import init_beanie
 from src.admin.datadef import AdminUser
 from src.api.auth import auth_router
 from src.api.pages.dashboard import admin_pages_router
+from src.api.actions.assets import assets_actions_router
 from src.api.actions.organizations import organizations_actions_router
 from src.api.actions.twilio import twilio_actions_router
 from src.database.mongodb import mongo, set_up_mongo
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
+from src.assets.datadef import AssetDocument
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_beanie(
         database=mongo, #type: ignore
-        document_models=[AdminUser, OrganizationDocument, MemberUser]
+        document_models=[AdminUser, OrganizationDocument, MemberUser, AssetDocument]
     )
     print("Beanie initialized!")
     await set_up_mongo()
@@ -27,6 +29,7 @@ app.include_router(auth_router)
 app.include_router(admin_pages_router)
 app.include_router(organizations_actions_router)
 app.include_router(twilio_actions_router)
+app.include_router(assets_actions_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

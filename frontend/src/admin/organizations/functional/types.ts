@@ -8,12 +8,24 @@ export interface OrganizationMemberData {
     signOutTime: Date | null
     lastSignIn: Date | null
     endpoint: string
+    assets: string[]
+}
+
+export interface OrganizationAssetData {
+    id: string
+    name: string
+    quantity: number
+    endpoint: string
+    checkOutTime: Date | null
+    checkInTime: Date | null
+    checkedOut: boolean
 }
 
 export interface OrganizationInterfaceData {
     name: string
     id: string
     users: OrganizationMemberData[]
+    assets: OrganizationAssetData[]
 }
 
 export interface AddMemberFormData {
@@ -22,6 +34,34 @@ export interface AddMemberFormData {
     contactName: string;
     contactNumber: string;
     useContact: boolean;
+}
+
+export interface AddAssetFormData {
+    name: string;
+    orgId: string;
+    quantity: number;
+}
+
+export interface OrganizationMemberEditForm {
+    orgId: string
+    id: string
+    name: string
+    contactName: string
+    contactNumber: string
+    useContact: boolean
+    signInTime: Date | null
+    signOutTime: Date | null
+    lastSignIn: Date | null
+    endpoint: string
+    delete_user: boolean
+}
+
+export interface OrganizationAssetEditForm {
+    orgId: string
+    id: string
+    name: string
+    quantity: number
+    deleteAsset: boolean
 }
 
 export interface SignInResponse {
