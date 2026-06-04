@@ -181,7 +181,7 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
 
     return (
         <div
-            class="flex items-center justify-between px-4 py-3 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
+            class="flex items-center justify-between px-4 py-3 mx-1 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
             onClick={props.onClick}
         >
             <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
@@ -249,7 +249,7 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
     };
 
     return (
-        <div class="flex flex-col gap-3 mx-3">
+        <div class="flex flex-col gap-3 mx-3 py-2">
             <div class="flex flex-col gap-1">
                 <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Name</label>
                 <input

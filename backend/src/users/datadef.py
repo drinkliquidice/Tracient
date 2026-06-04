@@ -7,10 +7,14 @@ from settings import settings
 from utils import PyObjectId
 
 
+class ContactSubDocument(Document):
+    name: str
+    contact_number: str
+
+
 class MemberUser(Document):
     name: str
-    contact_name: str
-    contact_number: str
+    contacts: list[ContactSubDocument] = []
     endpoint: str
     assets: list[PyObjectId] = []
     use_contact: bool = False
@@ -22,14 +26,13 @@ class MemberUser(Document):
         name = "memberUsers"
 
     @staticmethod
-    def assemble(name: str, contact_name: str, contact_number: str, use_contact: bool) -> MemberUser:
+    def assemble(name: str, contacts: list[ContactSubDocument], use_contact: bool) -> MemberUser:
         doc_id = PydanticObjectId()
         member_endpoint = settings.TRACIENT_URL + "admin/member/" + str(doc_id)
         return MemberUser(
             id=doc_id,
             name=name,
-            contact_name=contact_name,
-            contact_number=contact_number,
+            contacts=contacts,
             endpoint=member_endpoint,
             sign_in_time=None,
             sign_out_time=None,

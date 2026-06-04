@@ -1,7 +1,12 @@
+export interface MemberContactData {
+    name: string
+    number: string
+}
+
 export interface OrganizationMemberData {
     id: string
     name: string
-    contactName: string
+    contacts: MemberContactData[]
     contactNumber: string
     useContact: boolean
     signInTime: Date | null

@@ -10,13 +10,16 @@ from src.admin.datadef import AdminUser
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
 from src.assets.datadef import AssetDocument
-    
+
+
+class MemberContactData(APIResponseModel):
+    name: str
+    contact_number: str   
 
 class OrganizationMemberData(APIResponseModel):
     id: str
     name: str
-    contact_name: str
-    contact_number: str
+    contacts: list[MemberContactData]
     sign_in_time: datetime | None 
     sign_out_time: datetime | None
     last_sign_in: datetime | None
@@ -60,6 +63,11 @@ async def get_dashboard_data(user: AdminUser) -> OrganizationInterfaceData:
             asset_doc = await AssetDocument.get(asset_id)
             if asset_doc is not None:
                 member_doc_assets.append(asset_doc.name)
+        member_contacts = [
+            MemberContactData(
+                name=contact.name, contact_number=contact.contact_number) 
+                for contact in member_doc.contacts
+            ]
         members_data.append(OrganizationMemberData(
             id=str(member_doc.id),
             name=member_doc.name,
@@ -67,8 +75,7 @@ async def get_dashboard_data(user: AdminUser) -> OrganizationInterfaceData:
             sign_out_time=member_doc.sign_out_time,
             last_sign_in=member_doc.last_signed_in,
             endpoint=member_doc.endpoint,
-            contact_name=member_doc.contact_name,
-            contact_number=member_doc.contact_number,
+            contacts=member_contacts,
             use_contact=member_doc.use_contact,
             assets=member_doc_assets,
         ))

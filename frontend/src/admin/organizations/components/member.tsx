@@ -111,7 +111,7 @@ export const MemberModal: Component<{
                             </span>
                         </div>
 
-                        <div class="flex-1 overflow-y-auto min-h-0 max-h-72 flex flex-col gap-1.5">
+                        <div class="flex-1 overflow-y-auto min-h-0 max-h-72 flex flex-col gap-1.5 px-1 py-1">
                             <Show
                                 when={props.member.assets.length > 0}
                                 fallback={
@@ -254,7 +254,7 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
 
     return (
         <div
-            class="flex items-center justify-between px-4 py-3 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
+            class="flex items-center justify-between px-4 py-3 mx-1 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
             onClick={props.onClick}
         >
             <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
@@ -327,7 +327,7 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
     };
 
     return (
-        <div class="flex flex-col gap-3 mx-3">
+        <div class="flex flex-col gap-3 mx-3 py-2">
             <div class="flex flex-col gap-1">
                 <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Name</label>
                 <input

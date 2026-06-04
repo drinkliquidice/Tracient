@@ -5,7 +5,7 @@ from fastapi import UploadFile, File, Form
 from pymongo.errors import DuplicateKeyError
 
 from src.admin.datadef import AdminUser
-from src.users.datadef import MemberUser
+from src.users.datadef import MemberUser, ContactSubDocument
 from src.assets.datadef import AssetDocument
 from src.database.mongodb import mongo
 from src.organizations.datadef import OrganizationDocument
@@ -21,16 +21,35 @@ class NewOrganizationForm:
         self.members_csv = members_csv
 
 
-async def parse_csv_and_add_users(csv_bytes: bytes) -> tuple[list[str], list[str]]:
+def create_contact_subdocuments(
+    contact_names: str,
+    contact_numbers: str
+) -> list[ContactSubDocument]:
+    contacts = []
+    contact_list = zip(contact_names.split(","), contact_numbers.split(","))
+    for name, number in contact_list:
+        contacts.append(ContactSubDocument(
+            name=name,
+            contact_number=number
+        ))
+    return contacts
+
+
+async def parse_csv_and_add_components(
+    csv_bytes: bytes
+) -> int:
     member_csv_data = StringIO(csv_bytes.decode('utf-8'))
     reader = csv.DictReader(member_csv_data)
     members: list[MemberUser] = []
     asset_list: list[AssetDocument] = []
     for row in reader:
+        contacts: list[ContactSubDocument] = create_contact_subdocuments(
+            row["contact_name"],
+            row["contact_number"]
+        )
         member = MemberUser.assemble(
             name = row["name"],
-            contact_name = row["contact_name"],
-            contact_number = row["contact_number"],
+            contacts = contacts,
             use_contact= row.get("use_contact", "false").lower() == "true",
         )
         members.append(member)
@@ -46,7 +65,7 @@ async def parse_csv_and_add_users(csv_bytes: bytes) -> tuple[list[str], list[str
 
 async def create_new_organization(admin: AdminUser, form: NewOrganizationForm) -> None:
     csv_bytes = await form.members_csv.read()
-    member_ids, asset_ids = await parse_csv_and_add_users(csv_bytes)
+    member_ids, asset_ids = await parse_csv_and_add_components(csv_bytes)
  
     try:
         org_doc = await OrganizationDocument(
