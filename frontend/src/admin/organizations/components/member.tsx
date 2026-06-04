@@ -87,7 +87,7 @@ export const MemberModal: Component<{
                                 alt={`QR code for ${props.member.name}`}
                                 width={220}
                                 height={220}
-                                class="block"
+                                class="block print:w-[2cm] print:h-[2cm]"
                             />
                         </div>
                         <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
