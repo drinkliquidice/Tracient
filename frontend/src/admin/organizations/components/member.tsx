@@ -12,7 +12,8 @@ export const MemberModal: Component<{
     onSave: (updated: Pick<OrganizationMemberEditForm, 'contactName' | 'contactNumber' | 'useContact' | 'delete_user'>) => Promise<void>;
 }> = (props) => {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.member.endpoint)}`;
-
+    const qrPrintUrl = `https://api.qrserver.com/v1/create-qr-code/?size=76x76&data=${encodeURIComponent(props.member.endpoint)}`;
+    // 76px ≈ 2cm at 96dpi — close enough for most printers
     const [contactName, setContactName] = createSignal(props.member.contactName);
     const [contactNumber, setContactNumber] = createSignal(props.member.contactNumber);
     const [useContact, setUseContact] = createSignal(props.member.useContact);
@@ -82,21 +83,30 @@ export const MemberModal: Component<{
                     {/* COL 1 — QR */}
                     <div class="flex flex-col items-center gap-4 px-7 py-7 border-r border-text/8">
                         <div class="p-3 bg-white rounded-sm">
+                            {/* Screen */}
                             <img
                                 src={qrUrl}
                                 alt={`QR code for ${props.member.name}`}
                                 width={220}
                                 height={220}
-                                class="block print:w-[2cm] print:h-[2cm]"
+                                class="block print:hidden"
+                            />
+                            {/* Print */}
+                            <img
+                                src={qrPrintUrl}
+                                alt={`QR code for ${props.member.name}`}
+                                width={76}
+                                height={76}
+                                class="hidden print:block print:w-[2cm] print:h-[2cm]"
                             />
                         </div>
-                        <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
+                        <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center print:hidden">
                             {props.member.endpoint}
                         </span>
                         <a
                             href={qrUrl}
                             download={`${props.member.name}-qr.png`}
-                            class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
+                            class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center print:hidden"
                         >
                             Download PNG
                         </a>
