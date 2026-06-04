@@ -91,20 +91,12 @@ export const MemberModal: Component<{
                                 height={220}
                                 class="block print:hidden"
                             />
-                            {/* Print */}
-                            <img
-                                src={qrPrintUrl}
-                                alt={`QR code for ${props.member.name}`}
-                                width={76}
-                                height={76}
-                                class="hidden print:block print:w-[2cm] print:h-[2cm]"
-                            />
                         </div>
                         <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center print:hidden">
                             {props.member.endpoint}
                         </span>
                         <a
-                            href={qrUrl}
+                            href={qrPrintUrl}
                             download={`${props.member.name}-qr.png`}
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center print:hidden"
                         >
