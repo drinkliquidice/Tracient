@@ -153,21 +153,22 @@ export const MemberModal: Component<{
 
                     <div class="flex flex-col items-center gap-4 px-7 py-7 border-r border-text/8">
                         <div class="p-3 bg-white rounded-sm">
+                            {/* Screen */}
                             <img
                                 src={qrUrl()}
                                 alt={`QR code for ${props.member.name}`}
                                 width={220}
                                 height={220}
-                                class="block"
+                                class="block print:hidden"
                             />
                         </div>
-                        <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
+                        <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center print:hidden">
                             {props.member.endpoint}
                         </span>
                         <a
                             href={qrUrl()}
                             download={`${props.member.name}-qr.png`}
-                            class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
+                            class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center print:hidden"
                         >
                             Download PNG
                         </a>
