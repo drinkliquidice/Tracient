@@ -1,6 +1,7 @@
 from __future__ import annotations
 import csv
 from io import StringIO
+from itertools import zip_longest
 from fastapi import UploadFile, File, Form
 from pymongo.errors import DuplicateKeyError
 
@@ -23,21 +24,27 @@ class NewOrganizationForm:
 
 def create_contact_subdocuments(
     contact_names: str,
-    contact_numbers: str
+    contact_numbers: str,
+    contact_emails: str = "",
 ) -> list[ContactSubDocument]:
-    contacts = []
-    contact_list = zip(contact_names.split(","), contact_numbers.split(","))
-    for name, number in contact_list:
+    names = [part.strip() for part in contact_names.split(",")]
+    numbers = [part.strip() for part in contact_numbers.split(",")]
+    emails = [part.strip() for part in contact_emails.split(",")] if contact_emails else []
+    contacts: list[ContactSubDocument] = []
+    for name, number, email in zip_longest(names, numbers, emails, fillvalue=""):
+        if not (name or number or email):
+            continue
         contacts.append(ContactSubDocument(
-            name=name,
-            contact_number=number
+            name=name or "",
+            email=email or "",
+            contact_number=number or "",
         ))
     return contacts
 
 
 async def parse_csv_and_add_components(
     csv_bytes: bytes
-) -> int:
+) -> tuple[list, list]:
     member_csv_data = StringIO(csv_bytes.decode('utf-8'))
     reader = csv.DictReader(member_csv_data)
     members: list[MemberUser] = []
@@ -45,17 +52,19 @@ async def parse_csv_and_add_components(
     for row in reader:
         contacts: list[ContactSubDocument] = create_contact_subdocuments(
             row["contact_name"],
-            row["contact_number"]
+            row["contact_number"],
+            row.get("contact_email", ""),
         )
         member = MemberUser.assemble(
             name = row["name"],
             contacts = contacts,
-            use_contact= row.get("use_contact", "false").lower() == "true",
+            use_sms= row.get("use_sms", row.get("use_contact", "false")).lower() == "true",
+            use_email= row.get("use_email", "false").lower() == "true",
         )
         members.append(member)
         asset_list.append(AssetDocument.assemble(
             name = row["asset_name"],
-            quantity = int(row["quantity"])
+            total_quantity = int(row.get("total_quantity") or row["quantity"])
         ))
     
     await MemberUser.insert_many(members)

@@ -19,6 +19,7 @@ interface CirculateResponse {
     memberName: string;
     assetName: string;
     remainingQuantity: number;
+    totalQuantity: number;
 }
 
 const HeaderCard: Component<{ navigateLogin: () => void }> = (props) => (
@@ -296,8 +297,8 @@ export const CirculationPage: Component = () => {
                                         <span class="text-text">{circResult()?.assetName}</span>
                                     </div>
                                     <div class="flex justify-between items-center border-b border-text/8 pb-3">
-                                        <span class="text-text/40 uppercase tracking-widest">Remaining</span>
-                                        <span class="text-text">{circResult()?.remainingQuantity}</span>
+                                        <span class="text-text/40 uppercase tracking-widest">Current</span>
+                                        <span class="text-text">{circResult()?.remainingQuantity} / {circResult()?.totalQuantity}</span>
                                     </div>
                                     <div class="flex justify-between items-center">
                                         <span class="text-text/40 uppercase tracking-widest">Time</span>

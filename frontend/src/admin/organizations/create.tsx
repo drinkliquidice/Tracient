@@ -212,9 +212,13 @@ const CreateOrganizationBody: Component = () => {
                         <p class="text-text-muted font-light tracking-wide leading-relaxed mb-4">
                             Your organization has been created successfully.
                         </p>
-                        <a href="/admin/dashboard" class="text-accent hover:underline">
+                        <button
+                            type="button"
+                            class="text-accent hover:underline"
+                            onClick={() => navigate('/admin/dashboard')}
+                        >
                             Go to Dashboard
-                        </a>
+                        </button>
                     </div>
                 }
             >

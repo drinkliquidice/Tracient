@@ -1,4 +1,4 @@
-import { Component, createSignal } from "solid-js";
+import { Component, createEffect, createSignal } from "solid-js";
 import {
     inputBase,
     AddAssetFormData,
@@ -9,25 +9,45 @@ import {
 export const AssetModal: Component<{
     asset: OrganizationAssetData;
     onClose: () => void;
-    onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'quantity' | 'deleteAsset'>) => Promise<void>;
+    onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>) => Promise<void>;
 }> = (props) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.asset.endpoint)}`;
+    const qrUrl = () =>
+        `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.asset.endpoint)}`;
 
     const [name, setName] = createSignal(props.asset.name);
-    const [quantity, setQuantity] = createSignal(props.asset.quantity);
+    const [totalQuantity, setTotalQuantity] = createSignal(props.asset.totalQuantity);
+    const [currentQuantity, setCurrentQuantity] = createSignal(props.asset.currentQuantity);
     const [deleteAsset, setDeleteAsset] = createSignal(false);
     const [saving, setSaving] = createSignal(false);
     const [saveError, setSaveError] = createSignal('');
     const [saveSuccess, setSaveSuccess] = createSignal(false);
 
+    createEffect((prevId?: string) => {
+        const id = props.asset.id;
+        if (prevId !== id) {
+            setName(props.asset.name);
+            setTotalQuantity(props.asset.totalQuantity);
+            setCurrentQuantity(props.asset.currentQuantity);
+            setDeleteAsset(false);
+            setSaveError('');
+            setSaveSuccess(false);
+        }
+        return id;
+    });
+
     const dirty = () =>
         name() !== props.asset.name ||
-        quantity() !== props.asset.quantity ||
+        totalQuantity() !== props.asset.totalQuantity ||
+        currentQuantity() !== props.asset.currentQuantity ||
         deleteAsset() !== false;
 
     const handleSave = async () => {
-        if (!name().trim() || quantity() <= 0) {
+        if (!name().trim() || totalQuantity() <= 0) {
             setSaveError('All fields are required.');
+            return;
+        }
+        if (currentQuantity() < 0 || currentQuantity() > totalQuantity()) {
+            setSaveError('Current quantity must be between 0 and total.');
             return;
         }
         setSaving(true);
@@ -36,7 +56,8 @@ export const AssetModal: Component<{
         try {
             await props.onSave({
                 name: name().trim(),
-                quantity: quantity(),
+                totalQuantity: totalQuantity(),
+                currentQuantity: currentQuantity(),
                 deleteAsset: deleteAsset(),
             });
             setSaveSuccess(true);
@@ -80,7 +101,7 @@ export const AssetModal: Component<{
                     <div class="flex flex-col items-center gap-4 px-7 py-7 border-r border-text/8">
                         <div class="p-3 bg-white rounded-sm">
                             <img
-                                src={qrUrl}
+                                src={qrUrl()}
                                 alt={`QR code for ${props.asset.name}`}
                                 width={220}
                                 height={220}
@@ -91,7 +112,7 @@ export const AssetModal: Component<{
                             {props.asset.endpoint}
                         </span>
                         <a
-                            href={qrUrl}
+                            href={qrUrl()}
                             download={`${props.asset.name}-qr.png`}
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
                         >
@@ -104,12 +125,25 @@ export const AssetModal: Component<{
                         <span class="font-mono text-xs tracking-widest text-text/40 uppercase">Edit Details</span>
 
                         <div class="flex flex-col gap-1">
-                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Quantity</label>
+                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Current Quantity</label>
                             <input
                                 class={inputBase}
-                                value={quantity()}
+                                value={currentQuantity()}
                                 type="number"
-                                onInput={e => setQuantity(Number(e.currentTarget.value))}
+                                min="0"
+                                onInput={e => setCurrentQuantity(Number(e.currentTarget.value))}
+                                disabled={saving()}
+                            />
+                        </div>
+
+                        <div class="flex flex-col gap-1">
+                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Total Quantity</label>
+                            <input
+                                class={inputBase}
+                                value={totalQuantity()}
+                                type="number"
+                                min="1"
+                                onInput={e => setTotalQuantity(Number(e.currentTarget.value))}
                                 disabled={saving()}
                             />
                         </div>
@@ -188,6 +222,9 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
                 {props.asset.name}
             </span>
             <div class="flex items-center gap-2">
+                <span class="font-mono text-xs text-text/40 tracking-wide">
+                    {props.asset.currentQuantity}/{props.asset.totalQuantity}
+                </span>
                 {latestActivity()
                     ? (
                         <>
@@ -206,10 +243,10 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
                 <div
                     class="w-1.5 h-1.5 rounded-full"
                     classList={{
-                        'bg-accent': props.asset.checkInTime !== null && props.asset.checkOutTime === null,
-                        'bg-text/20': !(props.asset.checkInTime !== null && props.asset.checkOutTime === null),
+                        'bg-accent': props.asset.currentQuantity < props.asset.totalQuantity,
+                        'bg-text/20': props.asset.currentQuantity >= props.asset.totalQuantity,
                     }}
-                    title={props.asset.checkInTime !== null && props.asset.checkOutTime === null ? 'Online' : 'Offline'}
+                    title={props.asset.currentQuantity < props.asset.totalQuantity ? 'Checked out' : 'All in'}
                 />
             </div>
         </div>
@@ -218,13 +255,13 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
 
 export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetFormData) => Promise<void> }> = (props) => {
     const [name, setName] = createSignal('');
-    const [quantity, setQuantity] = createSignal(1);
+    const [totalQuantity, setTotalQuantity] = createSignal(1);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal('');
     const [success, setSuccess] = createSignal(false);
 
     const handleSubmit = async () => {
-        if (!name().trim() || !quantity()) {
+        if (!name().trim() || !totalQuantity()) {
             setError('All fields are required.');
             return;
         }
@@ -235,10 +272,10 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
             await props.onAdd({
                 name: name().trim(),
                 orgId: props.orgId,
-                quantity: quantity(),
+                totalQuantity: totalQuantity(),
             });
             setName('');
-            setQuantity(1);
+            setTotalQuantity(1);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 2500);
         } catch (e: any) {
@@ -261,13 +298,13 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
                 />
             </div>
             <div class="flex flex-col gap-1">
-                <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Quantity</label>
+                <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Total Quantity</label>
                 <input
                     class={inputBase}
                     type="number"
                     placeholder="1"
-                    value={quantity()}
-                    onInput={e => setQuantity(parseInt(e.currentTarget.value) || 1)}
+                    value={totalQuantity()}
+                    onInput={e => setTotalQuantity(parseInt(e.currentTarget.value) || 1)}
                     disabled={loading()}
                 />
             </div>
