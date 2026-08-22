@@ -23,6 +23,7 @@ class CirculateResponse(APIResponseModel):
     member_name: str
     asset_name: str
     remaining_quantity: int
+    total_quantity: int
 
 async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> CirculateResponse:
     asset = await AssetDocument.get(form.asset_id)
@@ -37,15 +38,24 @@ async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> Circu
 
     if PydanticObjectId(form.asset_id) not in org.assets:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset does not belong to organization")
-    if form.check_out and asset.quantity <= 0:
+
+    asset.ensure_quantities()
+    previous_current = asset.current_quantity or 0
+
+    if form.check_out and previous_current <= 0:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="No available quantity to check out")
-    
+    if not form.check_out and previous_current >= asset.resolved_total():
+        raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Current quantity is already at total")
+
     try:
         if form.check_out:
-            await asset.update({"$inc": {"quantity": -1}})
+            asset.current_quantity = previous_current - 1
+            asset.check_out_time = form.time
         else:
-            await asset.update({"$inc": {"quantity": 1}})
-        
+            asset.current_quantity = previous_current + 1
+            asset.check_in_time = form.time
+        asset.checked_out = asset.current_quantity < asset.resolved_total()
+        await asset.save()
     except Exception as e:
         logger.error(f"Failed to update asset quantity: {e}", exc_info=True)
         raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to update asset circulation")
@@ -57,12 +67,9 @@ async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> Circu
             await member.update({"$pull": {"assets": PydanticObjectId(form.asset_id)}})
     except Exception as e:
         logger.error(f"Failed to update member asset list: {e}", exc_info=True)
-        # Attempt to rollback asset quantity update
         try:
-            if form.check_out:
-                await asset.update({"$inc": {"quantity": 1}})
-            else:
-                await asset.update({"$inc": {"quantity": -1}})
+            asset.current_quantity = previous_current
+            await asset.save()
         except Exception as rollback_err:
             logger.critical(f"Failed to rollback asset quantity after member update failure: {rollback_err}", exc_info=True)
         raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to update member asset list")
@@ -70,5 +77,6 @@ async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> Circu
     return CirculateResponse(
         member_name=member.name,
         asset_name=asset.name,
-        remaining_quantity=asset.quantity + (-1 if form.check_out else 1),
+        remaining_quantity=asset.resolved_current(),
+        total_quantity=asset.resolved_total(),
     )

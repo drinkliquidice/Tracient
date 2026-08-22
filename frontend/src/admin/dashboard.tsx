@@ -1,10 +1,10 @@
-import { Component, createEffect, createResource, Match, Switch } from 'solid-js';
+import { Component, createEffect, createSignal, Match, onCleanup, Switch } from 'solid-js';
 
 
 import { backendRequest, getToken, logout } from '@/functional/utils';
 import { OrganizationInterfaceData} from '@/admin/organizations/functional/types';
 import { DashboardBody } from './organizations/interface';
-import { _mergeSearchString, useNavigate } from '@solidjs/router';
+import { useNavigate } from '@solidjs/router';
 
 const HeaderCard: Component<{
     navigateLogin: () => void;
@@ -63,36 +63,60 @@ const DashboardPage: Component = () => {
     const tok = getToken(); 
 
     if (!tok) {
-        window.location.href = '/login';
+        navigateLogin();
     }
 
+    const [pageData, setPageData] = createSignal<OrganizationInterfaceData | undefined>();
+    const [error, setError] = createSignal<{ status?: number } | undefined>();
+    const [initialLoading, setInitialLoading] = createSignal(true);
+    let inflight = false;
+
+    const load = async (silent = false) => {
+        if (!tok || inflight) return;
+        if (silent && document.hidden) return;
+        inflight = true;
+        if (!silent) setInitialLoading(true);
+        try {
+            const next = await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok);
+            setPageData(next);
+            setError(undefined);
+        } catch (e: any) {
+            setError(e);
+            if (e?.status === 401) navigateLogin();
+        } finally {
+            inflight = false;
+            setInitialLoading(false);
+        }
+    };
+
+    void load(false);
+    const timer = setInterval(() => { void load(true); }, 4000);
+    onCleanup(() => clearInterval(timer));
+
     createEffect(() => {
-        if ((pageData.error as any)?.status === 401) {
+        if (error()?.status === 401) {
             navigateLogin();
         }
     });
-
-    const [pageData] = createResource(
-        async () => {
-            return await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok!);
-        }
-    );
 
     return (
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
             <HeaderCard navigateLogin={navigateLogin} />
             <Switch>
-                <Match when={pageData.loading}>
+                <Match when={initialLoading() && !pageData()}>
                     <div class="flex-1 flex items-center justify-center">
                         <span class="w-6 h-6 border-2 border-text/20 border-t-text rounded-full animate-spin" />
                     </div> 
                 </Match>
 
-                <Match when={(pageData.error as any)?.status === 412}>
+                <Match when={error()?.status === 412}>
                     <NoOrganizationView />
                 </Match>
-                <Match when={pageData()}>
-                    <DashboardBody data={pageData()!} />
+                <Match when={!!pageData()}>
+                    <DashboardBody
+                        data={() => pageData()!}
+                        refetch={() => { void load(true); }}
+                    />
                 </Match>
             </Switch>
         </div>

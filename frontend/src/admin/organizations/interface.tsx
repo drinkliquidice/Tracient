@@ -1,5 +1,7 @@
 import { backendRequest, getToken } from "@/functional/utils";
-import { Component, createSignal } from "solid-js";
+import { Component, createEffect, createSignal, For, Show } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
+import { on } from "solid-js";
 import {
     AddAssetFormData,
     AddMemberFormData,
@@ -42,184 +44,222 @@ const ViewToggle: Component<{
     </div>
 );
 
-export const DashboardBody: Component<{ data: OrganizationInterfaceData }> = (props) => {
+export const DashboardBody: Component<{
+    data: () => OrganizationInterfaceData;
+    refetch: () => void;
+}> = (props) => {
     const navigate = useNavigate();
     const navigateLogin = () => navigate('/login/');
-    const tok = getToken(); 
+    const tok = getToken();
 
     if (!tok) {
         navigateLogin();
     }
 
+    const [org, setOrg] = createStore<OrganizationInterfaceData>(
+        JSON.parse(JSON.stringify(props.data()))
+    );
     const [view, setView] = createSignal<'members' | 'assets'>('members');
-    const [members, setMembers] = createSignal<OrganizationMemberData[]>(props.data.users);
-    const [assets, setAssets] = createSignal<OrganizationAssetData[]>(props.data.assets);
+    const [selectedMemberId, setSelectedMemberId] = createSignal<string | null>(null);
+    const [selectedAssetId, setSelectedAssetId] = createSignal<string | null>(null);
 
-    const [selectedMember, setSelectedMember] = createSignal<OrganizationMemberData | null>(null);
-    const [selectedAsset, setSelectedAsset] = createSignal<OrganizationAssetData | null>(null);
+    createEffect(on(
+        () => JSON.stringify(props.data()),
+        (serialized) => {
+            setOrg(reconcile(JSON.parse(serialized), { key: "id" }));
+        },
+        { defer: true }
+    ));
+
+    createEffect(() => {
+        const memberId = selectedMemberId();
+        if (memberId && !org.users.some(m => m.id === memberId)) {
+            setSelectedMemberId(null);
+        }
+        const assetId = selectedAssetId();
+        if (assetId && !org.assets.some(a => a.id === assetId)) {
+            setSelectedAssetId(null);
+        }
+    });
+
+    const selectedMember = () =>
+        org.users.find(m => m.id === selectedMemberId()) ?? null;
+    const selectedAsset = () =>
+        org.assets.find(a => a.id === selectedAssetId()) ?? null;
 
     const handleAddMember = async (data: AddMemberFormData) => {
-        await backendRequest('POST', '/api/admin/organization/member/add', tok!, {
+        const created = await backendRequest<OrganizationMemberData>('POST', '/api/admin/organization/member/add', tok!, {
             org_id: data.orgId,
             name: data.name,
-            contact_name: data.contactName,
-            contact_number: data.contactNumber,
-            use_contact: data.useContact,
+            contacts: data.contacts,
+            use_sms: data.useSms,
+            use_email: data.useEmail,
         });
+        setOrg("users", users => [...users, created]);
+        props.refetch();
     };
 
     const handleUpdateMember = async (
-        updated: Pick<OrganizationMemberEditForm, 'contactName' | 'contactNumber' | 'useContact' | 'delete_user'>
+        updated: Pick<OrganizationMemberEditForm, 'contacts' | 'useSms' | 'useEmail' | 'delete_user'>
     ) => {
-        await backendRequest('PATCH', '/api/admin/organization/member/update', tok!, {
-            org_id: props.data.id,
-            member_id: selectedMember()!.id,
-            contact_name: updated.contactName,
-            contact_number: updated.contactNumber,
-            use_contact: updated.useContact,
+        const memberId = selectedMemberId();
+        if (!memberId) return;
+
+        const saved = await backendRequest<OrganizationMemberData | null>('PATCH', '/api/admin/organization/member/update', tok!, {
+            org_id: org.id,
+            member_id: memberId,
+            contacts: updated.contacts,
+            use_sms: updated.useSms,
+            use_email: updated.useEmail,
             delete_user: updated.delete_user,
         });
 
         if (updated.delete_user) {
-            setMembers(prev => prev.filter(m => m.id !== selectedMember()!.id));
-            setSelectedMember(null);
-        } else {
-            setMembers(prev => prev.map(m =>
-                m.id === selectedMember()!.id
-                    ? { ...m, contactName: updated.contactName, contactNumber: updated.contactNumber, useContact: updated.useContact }
-                    : m
-            ));
-            setSelectedMember(prev => prev ? { ...prev, contactName: updated.contactName, contactNumber: updated.contactNumber, useContact: updated.useContact } : null);
+            setOrg("users", users => users.filter(m => m.id !== memberId));
+            setSelectedMemberId(null);
+        } else if (saved) {
+            const idx = org.users.findIndex(m => m.id === memberId);
+            if (idx >= 0) setOrg("users", idx, reconcile(saved));
         }
+        props.refetch();
     };
 
     const handleAddAsset = async (data: AddAssetFormData) => {
-        await backendRequest('POST', '/api/admin/organization/asset/add', tok!, {
+        const created = await backendRequest<OrganizationAssetData>('POST', '/api/admin/organization/asset/add', tok!, {
             org_id: data.orgId,
             name: data.name,
-            quantity: data.quantity,
+            total_quantity: data.totalQuantity,
         });
+        setOrg("assets", assets => [...assets, created]);
+        props.refetch();
     };
 
     const handleUpdateAsset = async (
-        updated: Pick<OrganizationAssetEditForm, 'name' | 'quantity' | 'deleteAsset'>
+        updated: Pick<OrganizationAssetEditForm, 'name' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>
     ) => {
-        await backendRequest('PATCH', '/api/admin/organization/asset/update', tok!, {
-            org_id: props.data.id,
-            asset_id: selectedAsset()!.id,
+        const assetId = selectedAssetId();
+        if (!assetId) return;
+
+        const saved = await backendRequest<OrganizationAssetData | null>('PATCH', '/api/admin/organization/asset/update', tok!, {
+            org_id: org.id,
+            asset_id: assetId,
             name: updated.name,
-            quantity: updated.quantity,
+            total_quantity: updated.totalQuantity,
+            current_quantity: updated.currentQuantity,
             delete_asset: updated.deleteAsset,
         });
 
         if (updated.deleteAsset) {
-            setAssets(prev => prev.filter(a => a.id !== selectedAsset()!.id));
-            setSelectedAsset(null);
-        } else {
-            setAssets(prev => prev.map(a =>
-                a.id === selectedAsset()!.id
-                    ? { ...a, name: updated.name, quantity: updated.quantity }
-                    : a
-            ));
-            setSelectedAsset(prev => prev ? { ...prev, name: updated.name, quantity: updated.quantity } : null);
+            setOrg("assets", assets => assets.filter(a => a.id !== assetId));
+            setSelectedAssetId(null);
+        } else if (saved) {
+            const idx = org.assets.findIndex(a => a.id === assetId);
+            if (idx >= 0) setOrg("assets", idx, reconcile(saved));
         }
+        props.refetch();
     };
 
     return (
         <div class="flex-1 grid grid-cols-2 gap-0 min-h-0 mx-4">
-            {selectedMember() && (
+            <Show when={selectedMemberId() && selectedMember()}>
                 <MemberModal
                     member={selectedMember()!}
-                    onClose={() => setSelectedMember(null)}
+                    onClose={() => setSelectedMemberId(null)}
                     onSave={handleUpdateMember}
                 />
-            )}
-            {selectedAsset() && (
+            </Show>
+            <Show when={selectedAssetId() && selectedAsset()}>
                 <AssetModal
                     asset={selectedAsset()!}
-                    onClose={() => setSelectedAsset(null)}
+                    onClose={() => setSelectedAssetId(null)}
                     onSave={handleUpdateAsset}
                 />
-            )}
+            </Show>
 
-            {/* LEFT — toggled list */}
             <div class="flex flex-col py-10 px-4 border-r border-text/8 min-h-0">
 
-                {/* Org name + toggle */}
                 <div class="flex items-center justify-between mb-8 py-2 mx-2">
                     <h1 class="font-mono font-bold text-3xl tracking-[0.12em] text-text uppercase">
-                        {props.data.name}
+                        {org.name}
                     </h1>
                     <ViewToggle view={view()} onChange={setView} />
                 </div>
 
-                {/* Count row */}
                 <div class="flex items-center gap-3 mb-4">
                     <span class="font-mono text-xs tracking-widest text-text/40 uppercase">
                         {view() === 'members' ? 'Members' : 'Assets'}
                     </span>
                     <div class="flex-1 h-px bg-text/8" />
                     <span class="font-mono text-xs text-text/30">
-                        {view() === 'members' ? props.data.users.length : props.data.assets.length}
+                        {view() === 'members' ? org.users.length : org.assets.length}
                     </span>
                 </div>
 
-                {/* List */}
                 <div class="flex-1 overflow-y-auto min-h-0 border border-text/8 rounded-sm p-2 flex flex-col gap-1.5 bg-bg/40">
                     {view() === 'members'
-                        ? props.data.users.length === 0
-                            ? (
-                                <div class="flex-1 flex items-center justify-center">
-                                    <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No members yet</span>
-                                </div>
-                            )
-                            : props.data.users.map(member => (
-                                <MemberCard
-                                    member={member}
-                                    onClick={() => setSelectedMember(member)}
-                                />
-                            ))
-                        : props.data.assets.length === 0
-                            ? (
-                                <div class="flex-1 flex items-center justify-center">
-                                    <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No assets yet</span>
-                                </div>
-                            )
-                            : props.data.assets.map(asset => (
-                                <AssetCard
-                                    asset={asset}
-                                    onClick={() => setSelectedAsset(asset)}
-                                />
-                            ))
+                        ? (
+                            <Show
+                                when={org.users.length > 0}
+                                fallback={
+                                    <div class="flex-1 flex items-center justify-center">
+                                        <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No members yet</span>
+                                    </div>
+                                }
+                            >
+                                <For each={org.users}>
+                                    {(member) => (
+                                        <MemberCard
+                                            member={member}
+                                            onClick={() => setSelectedMemberId(member.id)}
+                                        />
+                                    )}
+                                </For>
+                            </Show>
+                        )
+                        : (
+                            <Show
+                                when={org.assets.length > 0}
+                                fallback={
+                                    <div class="flex-1 flex items-center justify-center">
+                                        <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No assets yet</span>
+                                    </div>
+                                }
+                            >
+                                <For each={org.assets}>
+                                    {(asset) => (
+                                        <AssetCard
+                                            asset={asset}
+                                            onClick={() => setSelectedAssetId(asset.id)}
+                                        />
+                                    )}
+                                </For>
+                            </Show>
+                        )
                     }
                 </div>
             </div>
 
-            {/* RIGHT — Add forms */}
             <div class="flex flex-col py-10 px-4 min-h-0 overflow-y-auto">
 
-                {/* Add Member */}
                 <div class="flex flex-col">
                     <div class="mb-8">
                         <h2 class="font-mono font-bold text-xl tracking-[0.12em] text-text uppercase">Add Member</h2>
                         <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Add another user to the organization</p>
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
-                        <AddMemberForm orgId={props.data.id} onAdd={handleAddMember} />
+                        <AddMemberForm orgId={org.id} onAdd={handleAddMember} />
                     </div>
                 </div>
 
-                {/* Divider */}
                 <div class="h-px bg-text/8 mx-4 my-20" />
 
-                {/* Add Asset */}
                 <div class="flex flex-col">
                     <div class="mb-8">
                         <h2 class="font-mono font-bold text-xl tracking-[0.12em] text-text uppercase">Add Asset</h2>
                         <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Register a new asset for the organization</p>
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
-                        <AddAssetForm orgId={props.data.id} onAdd={handleAddAsset} />
+                        <AddAssetForm orgId={org.id} onAdd={handleAddAsset} />
                     </div>
                 </div>
 

@@ -1,48 +1,121 @@
-import { Component, createSignal, For, Show } from "solid-js";
+import { Component, createEffect, createSignal, For, Show } from "solid-js";
+import { createStore, reconcile, unwrap } from "solid-js/store";
 import {
-    inputBase,
     AddMemberFormData,
+    emptyContact,
+    inputBase,
+    MemberContactData,
     OrganizationMemberData,
     OrganizationMemberEditForm
 } from "@/admin/organizations/functional/types";
+import { cleanedContacts, ContactCarousel, contactsAreComplete } from "./contacts";
+
+const CheckRow: Component<{
+    checked: boolean;
+    label: string;
+    disabled?: boolean;
+    danger?: boolean;
+    onToggle: () => void;
+}> = (props) => (
+    <div class="flex items-center gap-3">
+        <button
+            type="button"
+            role="checkbox"
+            aria-checked={props.checked}
+            class="w-4 h-4 rounded-sm border border-text/20 flex items-center justify-center transition-colors shrink-0"
+            classList={{
+                'bg-accent border-accent': props.checked,
+                'bg-transparent': !props.checked,
+            }}
+            onClick={props.onToggle}
+            disabled={props.disabled}
+        >
+            {props.checked && (
+                <svg class="w-3 h-3 text-text" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            )}
+        </button>
+        <label
+            class="font-mono text-xs tracking-widest uppercase cursor-pointer select-none"
+            classList={{
+                'text-red-400': props.danger,
+                'text-text/40': !props.danger,
+            }}
+            onClick={props.onToggle}
+        >
+            {props.label}
+        </label>
+    </div>
+);
 
 export const MemberModal: Component<{
     member: OrganizationMemberData;
     onClose: () => void;
-    onSave: (updated: Pick<OrganizationMemberEditForm, 'contactName' | 'contactNumber' | 'useContact' | 'delete_user'>) => Promise<void>;
+    onSave: (updated: Pick<OrganizationMemberEditForm, 'contacts' | 'useSms' | 'useEmail' | 'delete_user'>) => Promise<void>;
 }> = (props) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.member.endpoint)}`;
-    const qrPrintUrl = `https://api.qrserver.com/v1/create-qr-code/?size=76x76&data=${encodeURIComponent(props.member.endpoint)}`;
-    // 76px ≈ 2cm at 96dpi — close enough for most printers
-    const [contactName, setContactName] = createSignal(props.member.contactName);
-    const [contactNumber, setContactNumber] = createSignal(props.member.contactNumber);
-    const [useContact, setUseContact] = createSignal(props.member.useContact);
+    const qrUrl = () =>
+        `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.member.endpoint)}`;
+
+    const seedContacts = (member: OrganizationMemberData): MemberContactData[] =>
+        member.contacts.length ? member.contacts.map(c => ({ ...c })) : [emptyContact()];
+
+    const [contacts, setContacts] = createStore<MemberContactData[]>(seedContacts(props.member));
+    const [useSms, setUseSms] = createSignal(props.member.useSms);
+    const [useEmail, setUseEmail] = createSignal(props.member.useEmail);
     const [deleteUser, setDeleteUser] = createSignal(false);
     const [saving, setSaving] = createSignal(false);
     const [saveError, setSaveError] = createSignal('');
     const [saveSuccess, setSaveSuccess] = createSignal(false);
 
+    createEffect((prevId?: string) => {
+        const id = props.member.id;
+        if (prevId !== id) {
+            setContacts(reconcile(seedContacts(props.member)));
+            setUseSms(props.member.useSms);
+            setUseEmail(props.member.useEmail);
+            setDeleteUser(false);
+            setSaveError('');
+            setSaveSuccess(false);
+        }
+        return id;
+    });
+
     const dirty = () =>
-        contactName() !== props.member.contactName ||
-        contactNumber() !== props.member.contactNumber ||
-        useContact() !== props.member.useContact ||
+        JSON.stringify(unwrap(contacts)) !== JSON.stringify(props.member.contacts) ||
+        useSms() !== props.member.useSms ||
+        useEmail() !== props.member.useEmail ||
         deleteUser() !== false;
 
     const handleSave = async () => {
-        if (!contactName().trim() || !contactNumber().trim()) {
-            setSaveError('All fields are required.');
+        const cleaned = cleanedContacts(unwrap(contacts));
+
+        if (!contactsAreComplete(cleaned)) {
+            setSaveError('Each contact needs a name, email, and number.');
             return;
         }
+        if (useSms() && cleaned.every(c => !c.contactNumber)) {
+            setSaveError('Add a phone number to send SMS notifications.');
+            return;
+        }
+        if (useEmail() && cleaned.every(c => !c.email)) {
+            setSaveError('Add an email to send email notifications.');
+            return;
+        }
+
         setSaving(true);
         setSaveError('');
         setSaveSuccess(false);
         try {
             await props.onSave({
-                contactName: contactName().trim(),
-                contactNumber: contactNumber().trim(),
-                useContact: useContact(),
+                contacts: cleaned,
+                useSms: useSms(),
+                useEmail: useEmail(),
                 delete_user: deleteUser(),
             });
+            if (!deleteUser()) {
+                setContacts(reconcile(cleaned.length ? cleaned : [emptyContact()]));
+            }
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2500);
         } catch (e: any) {
@@ -64,7 +137,6 @@ export const MemberModal: Component<{
         >
             <div class="flex flex-col gap-0 bg-surface border border-text/10 rounded-sm shadow-2xl w-full max-w-240">
 
-                {/* Header */}
                 <div class="flex items-center justify-between px-7 py-5 border-b border-text/8">
                     <span class="font-mono font-bold text-sm tracking-widest text-text uppercase">
                         {props.member.name}
@@ -77,15 +149,13 @@ export const MemberModal: Component<{
                     </button>
                 </div>
 
-                {/* Body — QR | Assets | Edit */}
                 <div class="grid grid-cols-3 gap-0">
 
-                    {/* COL 1 — QR */}
                     <div class="flex flex-col items-center gap-4 px-7 py-7 border-r border-text/8">
                         <div class="p-3 bg-white rounded-sm">
                             {/* Screen */}
                             <img
-                                src={qrUrl}
+                                src={qrUrl()}
                                 alt={`QR code for ${props.member.name}`}
                                 width={220}
                                 height={220}
@@ -96,7 +166,7 @@ export const MemberModal: Component<{
                             {props.member.endpoint}
                         </span>
                         <a
-                            href={qrPrintUrl}
+                            href={qrUrl()}
                             download={`${props.member.name}-qr.png`}
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center print:hidden"
                         >
@@ -104,7 +174,6 @@ export const MemberModal: Component<{
                         </a>
                     </div>
 
-                    {/* COL 2 — Checked-out assets */}
                     <div class="flex flex-col gap-3 px-7 py-7 border-r border-text/8">
                         <div class="flex items-center justify-between">
                             <span class="font-mono text-xs tracking-widest text-text/40 uppercase">Checked Out</span>
@@ -113,7 +182,7 @@ export const MemberModal: Component<{
                             </span>
                         </div>
 
-                        <div class="flex-1 overflow-y-auto min-h-0 max-h-72 flex flex-col gap-1.5">
+                        <div class="flex-1 overflow-y-auto min-h-0 max-h-72 flex flex-col gap-1.5 px-1 py-1">
                             <Show
                                 when={props.member.assets.length > 0}
                                 fallback={
@@ -138,83 +207,32 @@ export const MemberModal: Component<{
                         </div>
                     </div>
 
-                    {/* COL 3 — Edit form */}
-                    <div class="flex flex-col gap-4 px-7 py-7">
-                        <span class="font-mono text-xs tracking-widest text-text/40 uppercase">Edit Details</span>
+                    <div class="flex flex-col gap-4 px-7 py-7 min-w-0">
+                        <ContactCarousel
+                            contacts={contacts}
+                            setContacts={setContacts}
+                            disabled={saving()}
+                        />
 
-                        <div class="flex flex-col gap-1">
-                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Contact Name</label>
-                            <input
-                                class={inputBase}
-                                value={contactName()}
-                                onInput={e => setContactName(e.currentTarget.value)}
-                                disabled={saving()}
-                            />
-                        </div>
-
-                        <div class="flex flex-col gap-1">
-                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Contact Number</label>
-                            <input
-                                class={inputBase}
-                                value={contactNumber()}
-                                onInput={e => setContactNumber(e.currentTarget.value)}
-                                disabled={saving()}
-                            />
-                        </div>
-
-                        <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                role="checkbox"
-                                aria-checked={useContact()}
-                                class="w-4 h-4 rounded-sm border border-text/20 flex items-center justify-center transition-colors shrink-0"
-                                classList={{
-                                    'bg-accent border-accent': useContact(),
-                                    'bg-transparent': !useContact(),
-                                }}
-                                onClick={() => setUseContact(v => !v)}
-                                disabled={saving()}
-                            >
-                                {useContact() && (
-                                    <svg class="w-3 h-3 text-text" viewBox="0 0 12 12" fill="none">
-                                        <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                )}
-                            </button>
-                            <label
-                                class="font-mono text-xs tracking-widest text-text/40 uppercase cursor-pointer select-none"
-                                onClick={() => setUseContact(v => !v)}
-                            >
-                                SMS notifications
-                            </label>
-                        </div>
-
-                        <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                role="checkbox"
-                                aria-checked={deleteUser()}
-                                class="w-4 h-4 rounded-sm border border-text/20 flex items-center justify-center transition-colors shrink-0"
-                                classList={{
-                                    'bg-accent border-accent': deleteUser(),
-                                    'bg-transparent': !deleteUser(),
-                                }}
-                                onClick={() => setDeleteUser(v => !v)}
-                                disabled={saving()}
-                            >
-                                {deleteUser() && (
-                                    <svg class="w-3 h-3 text-text" viewBox="0 0 12 12" fill="none">
-                                        <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                )}
-                            </button>
-                            <label
-                                class="font-mono text-xs tracking-widest text-red-400 uppercase cursor-pointer select-none"
-                                onClick={() => setDeleteUser(v => !v)}
-                            >
-                                Delete User
-                            </label>
-                        </div>
+                        <CheckRow
+                            checked={useSms()}
+                            label="SMS notifications"
+                            disabled={saving()}
+                            onToggle={() => setUseSms(v => !v)}
+                        />
+                        <CheckRow
+                            checked={useEmail()}
+                            label="Email notifications"
+                            disabled={saving()}
+                            onToggle={() => setUseEmail(v => !v)}
+                        />
+                        <CheckRow
+                            checked={deleteUser()}
+                            label="Delete User"
+                            danger
+                            disabled={saving()}
+                            onToggle={() => setDeleteUser(v => !v)}
+                        />
 
                         {saveError() && (
                             <p class="font-mono text-xs text-red-400/80 tracking-wide">{saveError()}</p>
@@ -254,9 +272,16 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
     const formatDate = (date: Date) =>
         date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 
+    const isOnline = () => {
+        const { signInTime, signOutTime } = props.member;
+        if (!signInTime) return false;
+        if (!signOutTime) return true;
+        return new Date(signInTime) > new Date(signOutTime);
+    };
+
     return (
         <div
-            class="flex items-center justify-between px-4 py-3 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
+            class="flex items-center justify-between px-4 py-3 mx-1 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
             onClick={props.onClick}
         >
             <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
@@ -281,10 +306,10 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
                 <div
                     class="w-1.5 h-1.5 rounded-full"
                     classList={{
-                        'bg-accent': props.member.signInTime !== null && props.member.signOutTime === null,
-                        'bg-text/20': !(props.member.signInTime !== null && props.member.signOutTime === null),
+                        'bg-accent': isOnline(),
+                        'bg-text/20': !isOnline(),
                     }}
-                    title={props.member.signInTime !== null && props.member.signOutTime === null ? 'Online' : 'Offline'}
+                    title={isOnline() ? 'Online' : 'Offline'}
                 />
             </div>
         </div>
@@ -293,16 +318,29 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
 
 export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData) => Promise<void> }> = (props) => {
     const [name, setName] = createSignal('');
-    const [contactName, setContactName] = createSignal('');
-    const [contactNumber, setContactNumber] = createSignal('');
-    const [useContact, setUseContact] = createSignal(false);
+    const [contacts, setContacts] = createStore<MemberContactData[]>([emptyContact()]);
+    const [useSms, setUseSms] = createSignal(false);
+    const [useEmail, setUseEmail] = createSignal(false);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal('');
     const [success, setSuccess] = createSignal(false);
 
     const handleSubmit = async () => {
-        if (!name().trim() || !contactName().trim() || !contactNumber().trim()) {
-            setError('All fields are required.');
+        const cleaned = cleanedContacts(unwrap(contacts));
+        if (!name().trim()) {
+            setError('Member name is required.');
+            return;
+        }
+        if (!contactsAreComplete(cleaned)) {
+            setError('Each contact needs a name, email, and number.');
+            return;
+        }
+        if (useSms() && cleaned.every(c => !c.contactNumber)) {
+            setError('Add a phone number to send SMS notifications.');
+            return;
+        }
+        if (useEmail() && cleaned.every(c => !c.email)) {
+            setError('Add an email to send email notifications.');
             return;
         }
         setLoading(true);
@@ -312,13 +350,14 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
             await props.onAdd({
                 name: name().trim(),
                 orgId: props.orgId,
-                contactName: contactName().trim(),
-                contactNumber: contactNumber().trim(),
-                useContact: useContact(),
+                contacts: cleaned,
+                useSms: useSms(),
+                useEmail: useEmail(),
             });
             setName('');
-            setContactName('');
-            setContactNumber('');
+            setContacts(reconcile([emptyContact()]));
+            setUseSms(false);
+            setUseEmail(false);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 2500);
         } catch (e: any) {
@@ -329,7 +368,7 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
     };
 
     return (
-        <div class="flex flex-col gap-3 mx-3">
+        <div class="flex flex-col gap-3 mx-3 py-2">
             <div class="flex flex-col gap-1">
                 <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Name</label>
                 <input
@@ -340,53 +379,25 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
                     disabled={loading()}
                 />
             </div>
-            <div class="flex flex-col gap-1">
-                <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Contact Name</label>
-                <input
-                    class={inputBase}
-                    placeholder="Parent Doe"
-                    value={contactName()}
-                    onInput={e => setContactName(e.currentTarget.value)}
-                    disabled={loading()}
-                />
-            </div>
-            <div class="flex flex-col gap-1">
-                <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Contact Number</label>
-                <input
-                    class={inputBase}
-                    placeholder="+1 123 456 7890"
-                    value={contactNumber()}
-                    onInput={e => setContactNumber(e.currentTarget.value)}
-                    disabled={loading()}
-                />
-            </div>
 
-            <div class="flex items-center gap-3">
-                <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={useContact()}
-                    class="w-4 h-4 rounded-sm border border-text/20 flex items-center justify-center transition-colors"
-                    classList={{
-                        'bg-accent border-accent': useContact(),
-                        'bg-transparent': !useContact(),
-                    }}
-                    onClick={() => setUseContact(v => !v)}
-                    disabled={loading()}
-                >
-                    {useContact() && (
-                        <svg class="w-3 h-3 text-text" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    )}
-                </button>
-                <label
-                    class="font-mono text-xs tracking-widest text-text/40 uppercase cursor-pointer select-none"
-                    onClick={() => setUseContact(v => !v)}
-                >
-                    Send SMS notifications
-                </label>
-            </div>
+            <ContactCarousel
+                contacts={contacts}
+                setContacts={setContacts}
+                disabled={loading()}
+            />
+
+            <CheckRow
+                checked={useSms()}
+                label="SMS notifications"
+                disabled={loading()}
+                onToggle={() => setUseSms(v => !v)}
+            />
+            <CheckRow
+                checked={useEmail()}
+                label="Email notifications"
+                disabled={loading()}
+                onToggle={() => setUseEmail(v => !v)}
+            />
 
             {error() && (
                 <p class="font-mono text-xs text-red-400/80 tracking-wide">{error()}</p>
