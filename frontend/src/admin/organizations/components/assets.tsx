@@ -5,14 +5,14 @@ import {
     OrganizationAssetData,
     OrganizationAssetEditForm
 } from "@/admin/organizations/functional/types";
+import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/functional/qr";
 
 export const AssetModal: Component<{
     asset: OrganizationAssetData;
     onClose: () => void;
     onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>) => Promise<void>;
 }> = (props) => {
-    const qrUrl = () =>
-        `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.asset.endpoint)}`;
+    const qrUrl = () => qrCodeUrl(props.asset.endpoint);
 
     const [name, setName] = createSignal(props.asset.name);
     const [totalQuantity, setTotalQuantity] = createSignal(props.asset.totalQuantity);
@@ -103,21 +103,20 @@ export const AssetModal: Component<{
                             <img
                                 src={qrUrl()}
                                 alt={`QR code for ${props.asset.name}`}
-                                width={220}
-                                height={220}
                                 class="block"
+                                style={{ width: `${QR_SIDE_CM}cm`, height: `${QR_SIDE_CM}cm` }}
                             />
                         </div>
                         <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
                             {props.asset.endpoint}
                         </span>
-                        <a
-                            href={qrUrl()}
-                            download={`${props.asset.name}-qr.png`}
+                        <button
+                            type="button"
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
+                            onClick={() => openQrImageTab(props.asset.endpoint, props.asset.name)}
                         >
                             Download PNG
-                        </a>
+                        </button>
                     </div>
 
                     {/* RIGHT — Edit form */}
