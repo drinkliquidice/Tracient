@@ -90,7 +90,7 @@ const DashboardPage: Component = () => {
     };
 
     void load(false);
-    const timer = setInterval(() => { void load(true); }, 4000);
+    const timer = setInterval(() => { void load(true); }, 1800000);
     onCleanup(() => clearInterval(timer));
 
     createEffect(() => {

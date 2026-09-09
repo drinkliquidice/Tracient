@@ -9,6 +9,7 @@ import {
     OrganizationMemberEditForm
 } from "@/admin/organizations/functional/types";
 import { cleanedContacts, ContactCarousel, contactsAreComplete } from "./contacts";
+import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/functional/qr";
 
 const CheckRow: Component<{
     checked: boolean;
@@ -54,8 +55,7 @@ export const MemberModal: Component<{
     onClose: () => void;
     onSave: (updated: Pick<OrganizationMemberEditForm, 'contacts' | 'useSms' | 'useEmail' | 'delete_user'>) => Promise<void>;
 }> = (props) => {
-    const qrUrl = () =>
-        `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(props.member.endpoint)}`;
+    const qrUrl = () => qrCodeUrl(props.member.endpoint);
 
     const seedContacts = (member: OrganizationMemberData): MemberContactData[] =>
         member.contacts.length ? member.contacts.map(c => ({ ...c })) : [emptyContact()];
@@ -156,21 +156,20 @@ export const MemberModal: Component<{
                             <img
                                 src={qrUrl()}
                                 alt={`QR code for ${props.member.name}`}
-                                width={220}
-                                height={220}
                                 class="block"
+                                style={{ width: `${QR_SIDE_CM}cm`, height: `${QR_SIDE_CM}cm` }}
                             />
                         </div>
                         <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
                             {props.member.endpoint}
                         </span>
-                        <a
-                            href={qrUrl()}
-                            download={`${props.member.name}-qr.png`}
+                        <button
+                            type="button"
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
+                            onClick={() => openQrImageTab(props.member.endpoint, props.member.name)}
                         >
                             Download PNG
-                        </a>
+                        </button>
                     </div>
 
                     <div class="flex flex-col gap-3 px-7 py-7 border-r border-text/8">
