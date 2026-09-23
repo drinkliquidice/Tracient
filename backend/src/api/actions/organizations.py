@@ -6,7 +6,12 @@ from src.organizations.create import NewOrganizationForm, create_new_organizatio
 from src.organizations.interface import OrganizationAssetData, OrganizationMemberData
 from src.users.create import NewMemberForm, create_new_member
 from src.users.update import UpdateMemberForm, update_member
-from src.assets.create import NewAssetForm, create_new_asset
+from src.assets.create import (
+    AssetsCsvForm,
+    NewAssetForm,
+    create_assets_from_csv,
+    create_new_asset,
+)
 from src.assets.update import UpdateAssetForm, update_asset
 
 organizations_actions_router = APIRouter(prefix="/api/admin/organization")
@@ -32,6 +37,13 @@ async def add_asset_to_organization(
     admin: AdminUser = Depends(get_current_user),
 ) -> OrganizationAssetData:
     return await create_new_asset(form)
+
+@organizations_actions_router.post("/asset/add-csv")
+async def add_assets_from_csv_to_organization(
+    form: AssetsCsvForm = Depends(),
+    admin: AdminUser = Depends(get_current_user),
+) -> list[OrganizationAssetData]:
+    return await create_assets_from_csv(form)
 
 @organizations_actions_router.patch("/asset/update")
 async def update_organization_asset(

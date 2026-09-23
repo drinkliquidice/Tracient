@@ -167,8 +167,9 @@ const CreateOrganizationBody: Component = () => {
 
     const onFileChange = (e: Event) => {
         const file = (e.currentTarget as HTMLInputElement).files?.[0] ?? null;
-        if (file && !file.name.endsWith('.csv')) {
-            setErrors('csv', 'File must be a .csv');
+        const lower = file?.name.toLowerCase() ?? '';
+        if (file && !(lower.endsWith('.csv') || lower.endsWith('.tsv'))) {
+            setErrors('csv', 'File must be a .csv or .tsv');
             setCsvFile(null);
             return;
         }
@@ -247,12 +248,16 @@ const CreateOrganizationBody: Component = () => {
                     {/* CSV upload */}
                     <div class="flex flex-col gap-1">
                         <label class="font-mono text-sm text-text-muted">MEMBERS CSV</label>
+                        <p class="font-mono text-xs text-text-muted mb-1 leading-relaxed">
+                            Columns: name, contact_name, contact_number, contact_emails, use_contact.
+                            Assets are optional — upload a separate assets CSV from the dashboard after creation.
+                        </p>
 
                         {/* Hidden real file input */}
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".csv"
+                            accept=".csv,.tsv,text/csv,text/tab-separated-values"
                             class="hidden"
                             onChange={onFileChange}
                             disabled={isSubmitting()}
