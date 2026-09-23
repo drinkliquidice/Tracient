@@ -12,6 +12,8 @@ class ContactSubDocument(BaseModel):
     name: str
     email: str = ""
     contact_number: str
+    use_sms: bool = False
+    use_email: bool = False
 
 
 class MemberUser(Document):
@@ -37,20 +39,42 @@ class MemberUser(Document):
         if self.contacts:
             return self.contacts
         if self.contact_name or self.contact_number:
+            legacy_sms = self.use_sms if self.use_sms is not None else self.use_contact
             return [ContactSubDocument(
                 name=self.contact_name or "",
                 email="",
                 contact_number=self.contact_number or "",
+                use_sms=bool(legacy_sms),
+                use_email=self.use_email,
             )]
         return []
 
+    def contact_notify_prefs_set(self) -> bool:
+        return any(c.use_sms or c.use_email for c in self.resolved_contacts())
+
     def sms_enabled(self) -> bool:
+        contacts = self.resolved_contacts()
+        if any(c.use_sms or c.use_email for c in contacts):
+            return any(c.use_sms for c in contacts)
         if self.use_sms is not None:
             return self.use_sms
         return self.use_contact
 
     def email_enabled(self) -> bool:
+        contacts = self.resolved_contacts()
+        if any(c.use_sms or c.use_email for c in contacts):
+            return any(c.use_email for c in contacts)
         return self.use_email
+
+    def contact_should_sms(self, contact: ContactSubDocument) -> bool:
+        if self.contact_notify_prefs_set():
+            return contact.use_sms
+        return self.sms_enabled()
+
+    def contact_should_email(self, contact: ContactSubDocument) -> bool:
+        if self.contact_notify_prefs_set():
+            return contact.use_email
+        return self.email_enabled()
 
     @staticmethod
     def assemble(

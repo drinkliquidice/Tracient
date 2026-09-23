@@ -45,13 +45,15 @@ async def update_member(form: UpdateMemberForm) -> OrganizationMemberData | None
                 name=c.name.strip(),
                 email=c.email.strip(),
                 contact_number=c.contact_number.strip(),
+                use_sms=c.use_sms,
+                use_email=c.use_email,
             )
             for c in form.contacts
             if c.name.strip() or c.email.strip() or c.contact_number.strip()
         ]
         member.contacts = contacts
-        member.use_sms = form.use_sms
-        member.use_email = form.use_email
+        member.use_sms = form.use_sms or any(c.use_sms for c in contacts)
+        member.use_email = form.use_email or any(c.use_email for c in contacts)
         member.use_contact = False
         member.contact_name = None
         member.contact_number = None

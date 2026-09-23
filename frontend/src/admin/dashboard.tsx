@@ -100,7 +100,7 @@ const DashboardPage: Component = () => {
     });
 
     return (
-        <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
+        <div class="flex flex-col h-screen font-sans bg-bg text-text overflow-hidden">
             <HeaderCard navigateLogin={navigateLogin} />
             <Switch>
                 <Match when={initialLoading() && !pageData()}>

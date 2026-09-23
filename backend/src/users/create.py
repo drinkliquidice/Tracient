@@ -15,6 +15,8 @@ class ContactInput(APIRequestModel):
     name: str
     email: str = ""
     contact_number: str
+    use_sms: bool = False
+    use_email: bool = False
 
 
 class NewMemberForm(APIRequestModel):
@@ -30,15 +32,19 @@ class NewMemberForm(APIRequestModel):
                 name=c.name.strip(),
                 email=c.email.strip(),
                 contact_number=c.contact_number.strip(),
+                use_sms=c.use_sms,
+                use_email=c.use_email,
             )
             for c in self.contacts
             if c.name.strip() or c.email.strip() or c.contact_number.strip()
         ]
+        member_sms = self.use_sms or any(c.use_sms for c in contacts)
+        member_email = self.use_email or any(c.use_email for c in contacts)
         return MemberUser.assemble(
             name=self.name,
             contacts=contacts,
-            use_sms=self.use_sms,
-            use_email=self.use_email,
+            use_sms=member_sms,
+            use_email=member_email,
         )
 
 

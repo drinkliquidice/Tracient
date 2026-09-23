@@ -15,6 +15,8 @@ class MemberContactData(APIResponseModel):
     name: str
     email: str
     contact_number: str
+    use_sms: bool = False
+    use_email: bool = False
 
 class OrganizationMemberData(APIResponseModel):
     id: str
@@ -51,11 +53,14 @@ async def member_to_interface(member_doc: MemberUser) -> OrganizationMemberData:
         asset_doc = await AssetDocument.get(asset_id)
         if asset_doc is not None:
             member_doc_assets.append(asset_doc.name)
+    prefs_set = member_doc.contact_notify_prefs_set()
     member_contacts = [
         MemberContactData(
             name=contact.name,
             email=contact.email,
             contact_number=contact.contact_number,
+            use_sms=contact.use_sms if prefs_set else member_doc.sms_enabled(),
+            use_email=contact.use_email if prefs_set else member_doc.email_enabled(),
         )
         for contact in member_doc.resolved_contacts()
     ]
