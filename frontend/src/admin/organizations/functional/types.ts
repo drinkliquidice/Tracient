@@ -2,6 +2,8 @@ export interface MemberContactData {
     name: string
     email: string
     contactNumber: string
+    useSms: boolean
+    useEmail: boolean
 }
 
 export interface OrganizationMemberData {
@@ -39,8 +41,6 @@ export interface AddMemberFormData {
     name: string;
     orgId: string;
     contacts: MemberContactData[];
-    useSms: boolean;
-    useEmail: boolean;
 }
 
 export interface AddAssetFormData {
@@ -54,8 +54,6 @@ export interface OrganizationMemberEditForm {
     id: string
     name: string
     contacts: MemberContactData[]
-    useSms: boolean
-    useEmail: boolean
     signInTime: Date | null
     signOutTime: Date | null
     lastSignIn: Date | null
@@ -82,6 +80,8 @@ export const emptyContact = (): MemberContactData => ({
     name: '',
     email: '',
     contactNumber: '',
+    useSms: false,
+    useEmail: false,
 });
 
 export const inputBase = `

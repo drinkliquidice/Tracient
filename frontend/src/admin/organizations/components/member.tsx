@@ -50,19 +50,28 @@ const CheckRow: Component<{
     </div>
 );
 
+const normalizeContacts = (contacts: MemberContactData[]): MemberContactData[] =>
+    contacts.map(c => ({
+        name: c.name,
+        email: c.email,
+        contactNumber: c.contactNumber,
+        useSms: !!c.useSms,
+        useEmail: !!c.useEmail,
+    }));
+
 export const MemberModal: Component<{
     member: OrganizationMemberData;
     onClose: () => void;
-    onSave: (updated: Pick<OrganizationMemberEditForm, 'contacts' | 'useSms' | 'useEmail' | 'delete_user'>) => Promise<void>;
+    onSave: (updated: Pick<OrganizationMemberEditForm, 'contacts' | 'delete_user'>) => Promise<void>;
 }> = (props) => {
     const qrUrl = () => qrCodeUrl(props.member.endpoint);
 
     const seedContacts = (member: OrganizationMemberData): MemberContactData[] =>
-        member.contacts.length ? member.contacts.map(c => ({ ...c })) : [emptyContact()];
+        member.contacts.length
+            ? normalizeContacts(member.contacts)
+            : [emptyContact()];
 
     const [contacts, setContacts] = createStore<MemberContactData[]>(seedContacts(props.member));
-    const [useSms, setUseSms] = createSignal(props.member.useSms);
-    const [useEmail, setUseEmail] = createSignal(props.member.useEmail);
     const [deleteUser, setDeleteUser] = createSignal(false);
     const [saving, setSaving] = createSignal(false);
     const [saveError, setSaveError] = createSignal('');
@@ -72,8 +81,6 @@ export const MemberModal: Component<{
         const id = props.member.id;
         if (prevId !== id) {
             setContacts(reconcile(seedContacts(props.member)));
-            setUseSms(props.member.useSms);
-            setUseEmail(props.member.useEmail);
             setDeleteUser(false);
             setSaveError('');
             setSaveSuccess(false);
@@ -82,9 +89,7 @@ export const MemberModal: Component<{
     });
 
     const dirty = () =>
-        JSON.stringify(unwrap(contacts)) !== JSON.stringify(props.member.contacts) ||
-        useSms() !== props.member.useSms ||
-        useEmail() !== props.member.useEmail ||
+        JSON.stringify(unwrap(contacts)) !== JSON.stringify(seedContacts(props.member)) ||
         deleteUser() !== false;
 
     const handleSave = async () => {
@@ -94,12 +99,12 @@ export const MemberModal: Component<{
             setSaveError('Each contact needs a name, email, and number.');
             return;
         }
-        if (useSms() && cleaned.every(c => !c.contactNumber)) {
-            setSaveError('Add a phone number to send SMS notifications.');
+        if (cleaned.some(c => c.useSms && !c.contactNumber)) {
+            setSaveError('Contacts with SMS enabled need a phone number.');
             return;
         }
-        if (useEmail() && cleaned.every(c => !c.email)) {
-            setSaveError('Add an email to send email notifications.');
+        if (cleaned.some(c => c.useEmail && !c.email)) {
+            setSaveError('Contacts with email enabled need an email address.');
             return;
         }
 
@@ -109,8 +114,6 @@ export const MemberModal: Component<{
         try {
             await props.onSave({
                 contacts: cleaned,
-                useSms: useSms(),
-                useEmail: useEmail(),
                 delete_user: deleteUser(),
             });
             if (!deleteUser()) {
@@ -213,18 +216,6 @@ export const MemberModal: Component<{
                         />
 
                         <CheckRow
-                            checked={useSms()}
-                            label="SMS notifications"
-                            disabled={saving()}
-                            onToggle={() => setUseSms(v => !v)}
-                        />
-                        <CheckRow
-                            checked={useEmail()}
-                            label="Email notifications"
-                            disabled={saving()}
-                            onToggle={() => setUseEmail(v => !v)}
-                        />
-                        <CheckRow
                             checked={deleteUser()}
                             label="Delete User"
                             danger
@@ -317,8 +308,6 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
 export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFormData) => Promise<void> }> = (props) => {
     const [name, setName] = createSignal('');
     const [contacts, setContacts] = createStore<MemberContactData[]>([emptyContact()]);
-    const [useSms, setUseSms] = createSignal(false);
-    const [useEmail, setUseEmail] = createSignal(false);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal('');
     const [success, setSuccess] = createSignal(false);
@@ -333,12 +322,12 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
             setError('Each contact needs a name, email, and number.');
             return;
         }
-        if (useSms() && cleaned.every(c => !c.contactNumber)) {
-            setError('Add a phone number to send SMS notifications.');
+        if (cleaned.some(c => c.useSms && !c.contactNumber)) {
+            setError('Contacts with SMS enabled need a phone number.');
             return;
         }
-        if (useEmail() && cleaned.every(c => !c.email)) {
-            setError('Add an email to send email notifications.');
+        if (cleaned.some(c => c.useEmail && !c.email)) {
+            setError('Contacts with email enabled need an email address.');
             return;
         }
         setLoading(true);
@@ -349,13 +338,9 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
                 name: name().trim(),
                 orgId: props.orgId,
                 contacts: cleaned,
-                useSms: useSms(),
-                useEmail: useEmail(),
             });
             setName('');
             setContacts(reconcile([emptyContact()]));
-            setUseSms(false);
-            setUseEmail(false);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 2500);
         } catch (e: any) {
@@ -382,19 +367,6 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
                 contacts={contacts}
                 setContacts={setContacts}
                 disabled={loading()}
-            />
-
-            <CheckRow
-                checked={useSms()}
-                label="SMS notifications"
-                disabled={loading()}
-                onToggle={() => setUseSms(v => !v)}
-            />
-            <CheckRow
-                checked={useEmail()}
-                label="Email notifications"
-                disabled={loading()}
-                onToggle={() => setUseEmail(v => !v)}
             />
 
             {error() && (

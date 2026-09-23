@@ -41,6 +41,8 @@ def create_contact_subdocuments(
     contact_names: str,
     contact_numbers: str,
     contact_emails: str = "",
+    use_sms: bool = False,
+    use_email: bool = False,
 ) -> list[ContactSubDocument]:
     names = _split_csv_field(contact_names)
     numbers = [part.strip() for part in contact_numbers.split(",")] if contact_numbers else []
@@ -51,6 +53,8 @@ def create_contact_subdocuments(
             name=MISSING_TEXT,
             email=MISSING_TEXT,
             contact_number=MISSING_TEXT,
+            use_sms=use_sms,
+            use_email=use_email,
         )]
 
     contacts: list[ContactSubDocument] = []
@@ -64,6 +68,8 @@ def create_contact_subdocuments(
             name=_or_temp(name),
             email=_or_temp(email),
             contact_number=_or_temp(number),
+            use_sms=use_sms,
+            use_email=use_email,
         ))
 
     if not contacts:
@@ -71,6 +77,8 @@ def create_contact_subdocuments(
             name=MISSING_TEXT,
             email=MISSING_TEXT,
             contact_number=MISSING_TEXT,
+            use_sms=use_sms,
+            use_email=use_email,
         )]
     return contacts
 
@@ -97,19 +105,22 @@ async def parse_csv_and_add_members(csv_bytes: bytes) -> list[str]:
         ):
             continue
         contact_emails = row.get("contact_emails") or row.get("contact_email") or ""
+        use_contact = (row.get("use_contact") or "false").strip().lower() == "true"
+        use_sms_raw = (row.get("use_sms") or "").strip()
+        use_sms = use_sms_raw.lower() == "true" if use_sms_raw else use_contact
+        use_email = (row.get("use_email") or "false").strip().lower() == "true"
         contacts = create_contact_subdocuments(
             row.get("contact_name") or "",
             row.get("contact_number") or "",
             contact_emails,
+            use_sms=use_sms,
+            use_email=use_email,
         )
-        use_contact = (row.get("use_contact") or "false").strip().lower() == "true"
-        use_sms_raw = (row.get("use_sms") or "").strip()
-        use_sms = use_sms_raw.lower() == "true" if use_sms_raw else use_contact
         members.append(MemberUser.assemble(
             name=member_name,
             contacts=contacts,
             use_sms=use_sms,
-            use_email=(row.get("use_email") or "false").strip().lower() == "true",
+            use_email=use_email,
         ))
 
     if not members:

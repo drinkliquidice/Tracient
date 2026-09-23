@@ -58,7 +58,7 @@ async def member_tap(member_id: str):
             greeting = contact.name.strip() or "there"
             number = contact.contact_number.strip()
             email = contact.email.strip()
-            if member.sms_enabled() and number:
+            if member.contact_should_sms(contact) and number:
                 try:
                     await asyncio.to_thread(
                         send_sms,
@@ -67,7 +67,7 @@ async def member_tap(member_id: str):
                     )
                 except Exception as e:
                     logger.error(f"Failed to SMS contact {number}: {e}", exc_info=True)
-            if member.email_enabled() and email and can_email:
+            if member.contact_should_email(contact) and email and can_email:
                 try:
                     await asyncio.to_thread(
                         send_email,

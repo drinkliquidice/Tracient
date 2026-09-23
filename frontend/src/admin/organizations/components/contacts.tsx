@@ -2,6 +2,37 @@ import { Component, createEffect, createSignal, For } from "solid-js";
 import { SetStoreFunction } from "solid-js/store";
 import { emptyContact, inputBase, MemberContactData } from "@/admin/organizations/functional/types";
 
+const NotifyCheck: Component<{
+    checked: boolean;
+    label: string;
+    disabled?: boolean;
+    onToggle: () => void;
+}> = (props) => (
+    <button
+        type="button"
+        role="checkbox"
+        aria-checked={props.checked}
+        class="flex items-center gap-2 font-mono text-xs tracking-widest uppercase text-text/40 hover:text-text/70 disabled:opacity-45"
+        onClick={props.onToggle}
+        disabled={props.disabled}
+    >
+        <span
+            class="w-3.5 h-3.5 rounded-sm border border-text/20 flex items-center justify-center shrink-0"
+            classList={{
+                'bg-accent border-accent': props.checked,
+                'bg-transparent': !props.checked,
+            }}
+        >
+            {props.checked && (
+                <svg class="w-2.5 h-2.5 text-text" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            )}
+        </span>
+        {props.label}
+    </button>
+);
+
 export const ContactCarousel: Component<{
     contacts: MemberContactData[];
     setContacts: SetStoreFunction<MemberContactData[]>;
@@ -106,6 +137,20 @@ export const ContactCarousel: Component<{
                                             disabled={props.disabled}
                                         />
                                     </div>
+                                    <div class="flex items-center gap-4 pt-1">
+                                        <NotifyCheck
+                                            checked={contact.useSms}
+                                            label="SMS"
+                                            disabled={props.disabled}
+                                            onToggle={() => props.setContacts(i(), "useSms", !contact.useSms)}
+                                        />
+                                        <NotifyCheck
+                                            checked={contact.useEmail}
+                                            label="Email"
+                                            disabled={props.disabled}
+                                            onToggle={() => props.setContacts(i(), "useEmail", !contact.useEmail)}
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </For>
@@ -149,6 +194,8 @@ export const cleanedContacts = (contacts: MemberContactData[]): MemberContactDat
             name: c.name.trim(),
             email: c.email.trim(),
             contactNumber: c.contactNumber.trim(),
+            useSms: c.useSms,
+            useEmail: c.useEmail,
         }))
         .filter(c => c.name || c.email || c.contactNumber);
 
