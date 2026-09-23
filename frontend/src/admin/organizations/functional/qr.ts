@@ -82,7 +82,7 @@ export const openMemberQrSheet = (members: QrSheetMember[]) => {
 <meta charset="utf-8">
 <title>Member QR Codes</title>
 <style>
-  @page { size: A4 portrait; margin: 8mm; }
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -92,13 +92,15 @@ export const openMemberQrSheet = (members: QrSheetMember[]) => {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   .page {
-    width: 194mm;
-    height: 281mm;
+    width: 210mm;
+    height: 297mm;
+    padding: 8mm;
     display: grid;
     grid-template-columns: repeat(${QR_SHEET_COLS}, 1fr);
     grid-template-rows: repeat(${QR_SHEET_ROWS}, 1fr);
     page-break-after: always;
     break-after: page;
+    overflow: hidden;
   }
   .page:last-child {
     page-break-after: auto;
@@ -109,24 +111,37 @@ export const openMemberQrSheet = (members: QrSheetMember[]) => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2mm;
-    padding: 2mm;
+    gap: 1.2mm;
+    padding: 1mm;
+    min-height: 0;
+    min-width: 0;
     overflow: hidden;
   }
   .cell img {
-    width: 36mm;
-    height: 36mm;
+    /* Cell ≈ 48.5×46.8mm after page padding; keep QR + label inside that. */
+    width: 32mm;
+    height: 32mm;
+    max-width: 100%;
+    max-height: 70%;
     object-fit: contain;
+    flex-shrink: 0;
   }
   .label {
-    font-size: 8pt;
-    line-height: 1.15;
+    font-size: 7pt;
+    line-height: 1.1;
     text-align: center;
     max-width: 100%;
+    max-height: 8mm;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  @media print {
+    html, body { width: 210mm; height: 297mm; }
+    .page {
+      margin: 0;
+      box-shadow: none;
+    }
   }
   @media screen {
     body { padding: 12px; background: #e8e8e8; }
