@@ -12,7 +12,7 @@ import {
     OrganizationAssetEditForm,
 } from "./functional/types";
 import { MemberCard, MemberModal, AddMemberForm } from "./components/member";
-import { AssetCard, AssetModal, AddAssetForm } from "./components/assets";
+import { AssetCard, AssetModal, AddAssetForm, AddAssetsCsvForm } from "./components/assets";
 import { useNavigate } from "@solidjs/router";
 
 const ViewToggle: Component<{
@@ -132,6 +132,36 @@ export const DashboardBody: Component<{
         });
         setOrg("assets", assets => [...assets, created]);
         props.refetch();
+    };
+
+    const handleAddAssetsCsv = async (file: File): Promise<number> => {
+        const formData = new FormData();
+        formData.append('org_id', org.id);
+        formData.append('assets_csv', file);
+
+        const baseUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5173';
+        const res = await fetch(`${baseUrl}/api/admin/organization/asset/add-csv`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tok!}` },
+            body: formData,
+        });
+
+        const text = await res.text();
+        let data: OrganizationAssetData[] | { detail?: string };
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(text || res.statusText);
+        }
+        if (!res.ok) {
+            const detail = (data as { detail?: string })?.detail;
+            throw new Error(detail || res.statusText);
+        }
+
+        const created = data as OrganizationAssetData[];
+        setOrg("assets", assets => [...assets, ...created]);
+        props.refetch();
+        return created.length;
     };
 
     const handleUpdateAsset = async (
@@ -260,6 +290,18 @@ export const DashboardBody: Component<{
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
                         <AddAssetForm orgId={org.id} onAdd={handleAddAsset} />
+                    </div>
+                </div>
+
+                <div class="h-px bg-text/8 mx-4 my-10" />
+
+                <div class="flex flex-col">
+                    <div class="mb-8">
+                        <h2 class="font-mono font-bold text-xl tracking-[0.12em] text-text uppercase">Import Assets CSV</h2>
+                        <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Bulk-add assets after the organization is created</p>
+                    </div>
+                    <div class="border border-text/8 rounded-sm p-6 bg-surface">
+                        <AddAssetsCsvForm orgId={org.id} onAddCsv={handleAddAssetsCsv} />
                     </div>
                 </div>
 

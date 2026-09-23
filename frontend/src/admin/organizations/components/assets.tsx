@@ -328,3 +328,116 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
         </div>
     );
 };
+
+export const AddAssetsCsvForm: Component<{
+    orgId: string;
+    onAddCsv: (file: File) => Promise<number>;
+}> = (props) => {
+    const [csvFile, setCsvFile] = createSignal<File | null>(null);
+    const [loading, setLoading] = createSignal(false);
+    const [error, setError] = createSignal('');
+    const [success, setSuccess] = createSignal('');
+    let fileInputRef: HTMLInputElement | undefined;
+
+    const onFileChange = (e: Event) => {
+        const file = (e.currentTarget as HTMLInputElement).files?.[0] ?? null;
+        const lower = file?.name.toLowerCase() ?? '';
+        if (file && !(lower.endsWith('.csv') || lower.endsWith('.tsv'))) {
+            setError('File must be a .csv or .tsv');
+            setCsvFile(null);
+            return;
+        }
+        setError('');
+        setSuccess('');
+        setCsvFile(file);
+    };
+
+    const clearFile = () => {
+        setCsvFile(null);
+        setError('');
+        setSuccess('');
+        if (fileInputRef) fileInputRef.value = '';
+    };
+
+    const handleSubmit = async () => {
+        const file = csvFile();
+        if (!file) {
+            setError('Assets CSV is required.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const count = await props.onAddCsv(file);
+            clearFile();
+            setSuccess(`${count} asset${count === 1 ? '' : 's'} added successfully.`);
+            setTimeout(() => setSuccess(''), 2500);
+        } catch (e: any) {
+            setError(e?.message ?? 'Failed to upload assets CSV.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div class="flex flex-col gap-3 mx-3 py-2">
+            <p class="font-mono text-xs text-text/40 tracking-wide leading-relaxed">
+                Columns: name (or asset_name), total_quantity (or quantity).
+            </p>
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.tsv,text/csv,text/tab-separated-values"
+                class="hidden"
+                onChange={onFileChange}
+                disabled={loading()}
+            />
+
+            {csvFile()
+                ? (
+                    <div class="flex items-center justify-between gap-3 w-full px-3 py-2.5 border border-text/10 rounded-sm">
+                        <span class="font-mono text-sm text-text truncate">{csvFile()!.name}</span>
+                        <button
+                            type="button"
+                            onClick={clearFile}
+                            disabled={loading()}
+                            class="font-mono text-xs tracking-widest text-text/40 hover:text-text uppercase disabled:opacity-50"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                )
+                : (
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef?.click()}
+                        disabled={loading()}
+                        class="flex items-center gap-3 w-full px-3 py-2.5 border border-dashed border-text/15 rounded-sm font-mono text-sm text-text/40 hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+                    >
+                        Upload assets CSV
+                    </button>
+                )
+            }
+
+            {error() && (
+                <p class="font-mono text-xs text-red-400/80 tracking-wide">{error()}</p>
+            )}
+            {success() && (
+                <p class="font-mono text-xs text-accent/80 tracking-wide">{success()}</p>
+            )}
+
+            <button
+                class="mt-1 w-full py-3 bg-accent text-text font-mono text-sm tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleSubmit}
+                disabled={loading() || !csvFile()}
+            >
+                {loading()
+                    ? <span class="w-4 h-4 border-2 border-text/20 border-t-text rounded-full animate-spin" />
+                    : 'Import Assets CSV'
+                }
+            </button>
+        </div>
+    );
+};
