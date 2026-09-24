@@ -1,30 +1,7 @@
 import { Component, createResource, Match, Switch } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { backendRequest, getToken } from '@/functional/utils';
-
-const HeaderCard: Component = () => (
-    <div class="w-full h-20 bg-accent overflow-hidden flex items-center justify-between relative px-2">
-        {/* Dot grid */}
-        <div class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18] pointer-events-none" aria-hidden="true">
-            {Array.from({ length: 64 }).map((_, i) => (
-                <div
-                    class="w-0.75 h-0.75 rounded-full bg-text self-center justify-self-center animate-pulse"
-                    style={{ 'animation-delay': `${(i * 0.07) % 3}s` }}
-                />
-            ))}
-        </div>
-        <div class="mx-7 z-10 h-full flex flex-row gap-2 items-center">
-            <span
-                class="font-mono font-bold text-lg tracking-[0.25em] text-text"
-                style={{ 'padding-left': '1rem' }}
-            >
-                DASHBOARD
-            </span>
-        </div>
-        {/* Empty right side — no auth controls for public page */}
-        <div class="z-10 px-6" />
-    </div>
-);
+import { AppHeader } from '@/components/AppHeader';
 
 const SuccessView: Component<{ action: string; member: string; timestamp: string }> = (props) => (
     <div class="flex-1 flex flex-col items-center justify-center gap-6">
@@ -86,7 +63,7 @@ const MemberTapPage: Component = () => {
 
     return (
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
-            <HeaderCard />
+            <AppHeader title="MEMBER TAP" showAuth={false} />
             <Switch>
                 <Match when={result.loading}>
                     <div class="flex-1 flex items-center justify-center">

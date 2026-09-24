@@ -3,6 +3,7 @@ import { createStore } from 'solid-js/store';
 
 import '@/index.css';
 import { getToken } from '@/functional/utils';
+import { AppHeader } from '@/components/AppHeader';
 import { useNavigate } from '@solidjs/router';
 
 // ── types ────────────────────────────────────────────────────────────────────
@@ -106,45 +107,6 @@ const Field = (props: InputProps) => (
         <Show when={props.error}>
             <p class="font-mono text-xs text-error">{props.error}</p>
         </Show>
-    </div>
-);
-
-// ── header (matches dashboard) ────────────────────────────────────────────────
-
-const HeaderCard: Component = () => (
-    <div class="w-full h-20 bg-accent overflow-hidden flex items-center justify-between relative px-2">
-        {/* Dot grid */}
-        <div class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18] pointer-events-none" aria-hidden="true">
-            {Array.from({ length: 64 }).map((_, i) => (
-                <div
-                    class="w-0.75 h-0.75 rounded-full bg-text self-center justify-self-center animate-pulse"
-                    style={{ 'animation-delay': `${(i * 0.07) % 3}s` }}
-                />
-            ))}
-        </div>
-
-        <div class="mx-7 z-10 h-full flex flex-row gap-2 items-center">
-            <span
-                class="font-mono font-bold text-lg tracking-[0.25em] text-text"
-                style={{ 'padding-left': '1rem' }}
-            >
-                CREATE ORGANIZATION
-            </span>
-        </div>
-
-        <div class="z-10 flex items-center gap-4 px-6">
-            <span class="font-mono text-lg tracking-[0.15em] text-text/60">
-                ADMIN
-            </span>
-            <div class="w-px h-4 bg-text/15" />
-            <a
-                class="font-mono text-l tracking-[0.15em] text-text/60 hover:text-text transition-colors cursor-pointer"
-                style={{ 'padding-right': '1rem' }}
-                href="/login"
-            >
-                LOG OUT
-            </a>
-        </div>
     </div>
 );
 
@@ -354,7 +316,7 @@ const CreateOrganizationBody: Component = () => {
 
 const CreateOrganizationPage: Component = () => (
     <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
-        <HeaderCard />
+        <AppHeader title="CREATE ORGANIZATION" />
         <CreateOrganizationBody />
     </div>
 );
