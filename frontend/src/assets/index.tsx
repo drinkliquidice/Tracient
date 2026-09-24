@@ -1,4 +1,4 @@
-import { backendRequest, getToken, logout } from "@/functional/utils";
+import { backendRequest, getToken } from "@/functional/utils";
 import {
     Component,
     createSignal,
@@ -10,6 +10,7 @@ import {
 } from "solid-js";
 import QrScanner from "qr-scanner";
 import { getMemberIdFromEndpoint } from "@/admin/organizations/functional/functional";
+import { AppHeader } from "@/components/AppHeader";
 import { useNavigate } from "@solidjs/router";
 
 type Mode = 'check_out' | 'check_in';
@@ -21,37 +22,6 @@ interface CirculateResponse {
     remainingQuantity: number;
     totalQuantity: number;
 }
-
-const HeaderCard: Component<{ navigateLogin: () => void }> = (props) => (
-    <div class="w-full h-20 bg-accent overflow-hidden flex items-center justify-between relative px-2">
-        <div
-            class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18] pointer-events-none"
-            aria-hidden="true"
-        >
-            {Array.from({ length: 64 }).map((_, i) => (
-                <div
-                    class="w-0.75 h-0.75 rounded-full bg-text self-center justify-self-center animate-pulse"
-                    style={{ 'animation-delay': `${(i * 0.07) % 3}s` }}
-                />
-            ))}
-        </div>
-        <div class="mx-7 z-10 h-full flex items-center">
-            <span class="font-mono font-bold text-lg tracking-[0.25em] text-text" style={{ "padding-left": "1rem" }}>
-                CIRCULATION
-            </span>
-        </div>
-        <div class="z-10 flex items-center gap-4 px-6">
-            <span class="font-mono text-lg tracking-[0.15em] text-text/60">ADMIN</span>
-            <div class="w-px h-4 bg-text/15" />
-            <span
-                class="font-mono text-l tracking-[0.15em] text-text/60 hover:text-text transition-colors cursor-pointer"
-                onClick={() => { logout(); props.navigateLogin(); }}
-            >
-                LOG OUT
-            </span>
-        </div>
-    </div>
-);
 
 const QRCodeReader: Component<{
     onScan: (data: string) => void;
@@ -88,10 +58,9 @@ const QRCodeReader: Component<{
 export const CirculationPage: Component = () => {
     const tok = getToken();
     const navigate = useNavigate();
-    const navigateLogin = () => navigate('/login/');
 
     if (!tok) {
-        window.location.href = '/login';
+        navigate('/login/', { replace: true });
     }
 
     const [step, setStep] = createSignal<Step>('select_mode');
@@ -161,7 +130,7 @@ export const CirculationPage: Component = () => {
 
     return (
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
-            <HeaderCard navigateLogin={navigateLogin} />
+            <AppHeader title="CIRCULATION" />
 
             <div class="flex flex-1 items-center justify-center">
                 <div class="flex flex-col items-center gap-8 w-full max-w-md px-4">
