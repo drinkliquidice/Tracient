@@ -74,6 +74,9 @@ export interface SignInResponse {
     member: string;
     action: string;
     timestamp: string;
+    signInTime?: string | null;
+    signOutTime?: string | null;
+    lastSignIn?: string | null;
 }
 
 export const emptyContact = (): MemberContactData => ({
