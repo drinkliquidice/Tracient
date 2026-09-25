@@ -252,12 +252,17 @@ const CheckInBody: Component<{
         try {
             const result = await backendRequest<SignInResponse>('GET', `/member/${memberId}?action=${action}`, tok);
 
+            const toDate = (value: string | Date | null | undefined): Date | null => {
+                if (value == null) return null;
+                return value instanceof Date ? value : new Date(value);
+            };
+
             const idx = org.users.findIndex(m => m.id === memberId);
             if (idx >= 0) {
                 setOrg('users', idx, {
-                    signInTime: result.signInTime ?? (action === 'in' ? result.timestamp : member.signInTime),
-                    signOutTime: result.signOutTime ?? (action === 'out' ? result.timestamp : member.signOutTime),
-                    lastSignIn: result.lastSignIn ?? (action === 'in' ? result.timestamp : member.lastSignIn),
+                    signInTime: toDate(result.signInTime ?? (action === 'in' ? result.timestamp : member.signInTime)),
+                    signOutTime: toDate(result.signOutTime ?? (action === 'out' ? result.timestamp : member.signOutTime)),
+                    lastSignIn: toDate(result.lastSignIn ?? (action === 'in' ? result.timestamp : member.lastSignIn)),
                 });
             }
             setPending(null);
