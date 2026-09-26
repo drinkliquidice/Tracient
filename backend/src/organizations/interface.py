@@ -33,6 +33,7 @@ class OrganizationMemberData(APIResponseModel):
 class OrganizationAssetData(APIResponseModel):
     id: str
     name: str
+    asset_code: str
     total_quantity: int
     current_quantity: int
     endpoint: str
@@ -102,6 +103,7 @@ async def get_dashboard_data(user: AdminUser) -> OrganizationInterfaceData:
         assets_data.append(OrganizationAssetData(
             id=str(asset_doc.id),
             name=asset_doc.name,
+            asset_code=asset_doc.resolved_asset_code(),
             total_quantity=asset_doc.resolved_total(),
             current_quantity=asset_doc.resolved_current(),
             endpoint=asset_doc.endpoint,

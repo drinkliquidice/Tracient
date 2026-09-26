@@ -1,6 +1,6 @@
 import { Component, For, Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
-import { isLoggedIn, logout } from '@/functional/utils';
+import { logout } from '@/functional/utils';
 
 export type NavLink = {
     label: string;
@@ -15,11 +15,6 @@ const ADMIN_LINKS: NavLink[] = [
     { label: 'Create Organization', href: '/admin/organization/create' },
 ];
 
-const PUBLIC_LINKS: NavLink[] = [
-    { label: 'Log In', href: '/login' },
-    { label: 'Sign Up', href: '/signup' },
-];
-
 export const NavMenu: Component<{
     links?: NavLink[];
     /** Accent-bar styling (white/light icons) vs dark page surface */
@@ -29,8 +24,7 @@ export const NavMenu: Component<{
     const [open, setOpen] = createSignal(false);
     let rootRef: HTMLDivElement | undefined;
 
-    const links = () =>
-        props.links ?? (isLoggedIn() ? ADMIN_LINKS : PUBLIC_LINKS);
+    const links = () => props.links ?? ADMIN_LINKS;
 
     const tone = () => props.tone ?? 'accent';
 

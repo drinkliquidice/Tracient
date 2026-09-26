@@ -16,12 +16,14 @@ from src.organizations.interface import OrganizationAssetData
 class NewAssetForm(APIRequestModel):
     org_id: str
     name: str
+    asset_code: str
     total_quantity: int
 
     def create_document(self) -> AssetDocument:
         return AssetDocument.assemble(
             name=self.name,
             total_quantity=self.total_quantity,
+            asset_code=self.asset_code,
         )
 
 
@@ -43,6 +45,7 @@ def asset_to_interface(asset_doc: AssetDocument) -> OrganizationAssetData:
     return OrganizationAssetData(
         id=str(asset_doc.id),
         name=asset_doc.name,
+        asset_code=asset_doc.resolved_asset_code(),
         total_quantity=asset_doc.resolved_total(),
         current_quantity=asset_doc.resolved_current(),
         endpoint=asset_doc.endpoint,
@@ -50,6 +53,26 @@ def asset_to_interface(asset_doc: AssetDocument) -> OrganizationAssetData:
         check_in_time=asset_doc.check_in_time,
         checked_out=asset_doc.checked_out,
     )
+
+
+async def assert_asset_code_available(
+    org: OrganizationDocument,
+    asset_code: str,
+    *,
+    exclude_asset_id: str | None = None,
+) -> None:
+    code = asset_code.strip()
+    if not code:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset code is required")
+
+    for asset_id in org.assets:
+        if exclude_asset_id and str(asset_id) == exclude_asset_id:
+            continue
+        existing = await AssetDocument.get(asset_id)
+        if existing is None:
+            continue
+        if existing.resolved_asset_code().casefold() == code.casefold():
+            raise HTTPException(HTTPStatus.CONFLICT, detail="Asset code already in use")
 
 
 def _csv_dict_reader(csv_bytes: bytes) -> csv.DictReader:
@@ -65,10 +88,12 @@ def _csv_dict_reader(csv_bytes: bytes) -> csv.DictReader:
 def parse_assets_from_csv(csv_bytes: bytes) -> list[AssetDocument]:
     reader = _csv_dict_reader(csv_bytes)
     assets: list[AssetDocument] = []
+    seen_codes: set[str] = set()
     for row in reader:
-        name = (row.get("name") or row.get("asset_name") or "").strip() or MISSING_TEXT
+        name = (row.get("asset_name") or row.get("name") or "").strip() or MISSING_TEXT
+        code = (row.get("asset_code") or row.get("code") or "").strip()
         qty_raw = (row.get("total_quantity") or row.get("quantity") or "").strip()
-        if name == MISSING_TEXT and not qty_raw:
+        if name == MISSING_TEXT and not qty_raw and not code:
             # Completely blank row — skip
             if not any((v or "").strip() for v in row.values()):
                 continue
@@ -81,7 +106,19 @@ def parse_assets_from_csv(csv_bytes: bytes) -> list[AssetDocument]:
                 total_quantity = DEFAULT_ASSET_QUANTITY
         if total_quantity <= 0:
             total_quantity = DEFAULT_ASSET_QUANTITY
-        assets.append(AssetDocument.assemble(name=name, total_quantity=total_quantity))
+        asset = AssetDocument.assemble(
+            name=name,
+            total_quantity=total_quantity,
+            asset_code=code or None,
+        )
+        resolved = asset.resolved_asset_code().casefold()
+        if resolved in seen_codes:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST,
+                detail=f"Duplicate asset code in CSV: {asset.resolved_asset_code()}",
+            )
+        seen_codes.add(resolved)
+        assets.append(asset)
     if not assets:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Assets CSV must contain at least one asset")
     return assets
@@ -90,6 +127,14 @@ def parse_assets_from_csv(csv_bytes: bytes) -> list[AssetDocument]:
 async def create_new_asset(form: NewAssetForm) -> OrganizationAssetData:
     if form.total_quantity <= 0:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Total quantity must be greater than 0")
+    if not form.asset_code.strip():
+        raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset code is required")
+
+    org = await OrganizationDocument.get(form.org_id)
+    if org is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
+
+    await assert_asset_code_available(org, form.asset_code)
     asset_doc = form.create_document()
     try:
         await asset_doc.insert()
@@ -98,13 +143,7 @@ async def create_new_asset(form: NewAssetForm) -> OrganizationAssetData:
         raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to create new asset")
 
     try:
-        org = await OrganizationDocument.get(form.org_id)
-        if org is None:
-            await asset_doc.delete()
-            raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
         await org.update({"$push": {"assets": asset_doc.id}})
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Failed to add asset to org: {e}", exc_info=True)
         await asset_doc.delete()
@@ -120,6 +159,9 @@ async def create_assets_from_csv(form: AssetsCsvForm) -> list[OrganizationAssetD
     org = await OrganizationDocument.get(form.org_id)
     if org is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
+
+    for asset in assets:
+        await assert_asset_code_available(org, asset.resolved_asset_code())
 
     try:
         await AssetDocument.insert_many(assets)

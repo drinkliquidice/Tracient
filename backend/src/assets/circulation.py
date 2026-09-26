@@ -25,8 +25,22 @@ class CirculateResponse(APIResponseModel):
     remaining_quantity: int
     total_quantity: int
 
+
+async def resolve_asset(identifier: str) -> AssetDocument | None:
+    raw = identifier.strip()
+    if not raw:
+        return None
+    try:
+        by_id = await AssetDocument.get(PydanticObjectId(raw))
+        if by_id is not None:
+            return by_id
+    except Exception:
+        pass
+    return await AssetDocument.find_one(AssetDocument.asset_code == raw)
+
+
 async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> CirculateResponse:
-    asset = await AssetDocument.get(form.asset_id)
+    asset = await resolve_asset(form.asset_id)
     org = await OrganizationDocument.get(admin.organization)
     member = await MemberUser.get(form.member_id)
     if asset is None:
@@ -36,7 +50,7 @@ async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> Circu
     if member is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail="Member not found")
 
-    if PydanticObjectId(form.asset_id) not in org.assets:
+    if asset.id not in org.assets:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset does not belong to organization")
 
     asset.ensure_quantities()
@@ -62,9 +76,9 @@ async def circulate_asset(form: AssetCirculationForm, admin: AdminUser) -> Circu
     
     try:
         if form.check_out:
-            await member.update({"$push": {"assets": PydanticObjectId(form.asset_id)}})
+            await member.update({"$push": {"assets": asset.id}})
         else:
-            await member.update({"$pull": {"assets": PydanticObjectId(form.asset_id)}})
+            await member.update({"$pull": {"assets": asset.id}})
     except Exception as e:
         logger.error(f"Failed to update member asset list: {e}", exc_info=True)
         try:
