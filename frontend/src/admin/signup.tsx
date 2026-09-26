@@ -11,7 +11,6 @@ import {
 import { backendRequest } from '@/functional/utils';
 import showPasswordIcon from '@/admin/components/eye.svg'
 import hidePasswordIcon from '@/admin/components/noEye.svg'
-import { NavMenu } from '@/components/AppHeader';
 
 async function createNewAdmin(form: FormState): Promise<void> {
 		await backendRequest('POST', '/api/admin/signup', null, {
@@ -308,10 +307,7 @@ const FormCard: Component = () => {
 const SignupPage = () => {
 
 	return (
-		<div class="relative flex min-h-screen font-sans bg-bg text-text">
-			<div class="absolute top-5 left-5 z-30">
-				<NavMenu tone="surface" />
-			</div>
+		<div class="flex min-h-screen font-sans bg-bg text-text">
 			<SideBrandCard/>
 			<FormCard/>
 		</div>

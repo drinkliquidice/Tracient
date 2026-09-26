@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from utils import APIRequestModel
 from src.assets.datadef import AssetDocument
 from src.organizations.datadef import OrganizationDocument
-from src.assets.create import asset_to_interface
+from src.assets.create import assert_asset_code_available, asset_to_interface
 from src.organizations.interface import OrganizationAssetData
 from beanie.odm.fields import PydanticObjectId
 
@@ -14,6 +14,7 @@ class UpdateAssetForm(APIRequestModel):
     org_id: str
     asset_id: str
     name: str
+    asset_code: str
     total_quantity: int
     current_quantity: int
     delete_asset: bool
@@ -43,8 +44,21 @@ async def update_asset(form: UpdateAssetForm) -> OrganizationAssetData | None:
             raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Current quantity cannot be negative")
         if form.current_quantity > form.total_quantity:
             raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Current quantity cannot exceed total quantity")
+        if not form.asset_code.strip():
+            raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset code is required")
+
+        org = await OrganizationDocument.get(form.org_id)
+        if org is None:
+            raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
+
+        await assert_asset_code_available(
+            org,
+            form.asset_code,
+            exclude_asset_id=form.asset_id,
+        )
 
         asset.name = form.name
+        asset.asset_code = form.asset_code.strip()
         asset.total_quantity = form.total_quantity
         asset.current_quantity = form.current_quantity
         asset.checked_out = form.current_quantity < form.total_quantity

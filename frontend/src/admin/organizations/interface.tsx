@@ -121,7 +121,10 @@ export const DashboardBody: Component<{
         const q = assetQuery().trim().toLowerCase();
         const assets = [...org.assets].sort(byName);
         if (!q) return assets;
-        return assets.filter(a => a.name.toLowerCase().includes(q));
+        return assets.filter(a =>
+            a.name.toLowerCase().includes(q) ||
+            a.assetCode.toLowerCase().includes(q)
+        );
     });
 
     const handleAddMember = async (data: AddMemberFormData) => {
@@ -165,6 +168,7 @@ export const DashboardBody: Component<{
         const created = await backendRequest<OrganizationAssetData>('POST', '/api/admin/organization/asset/add', tok!, {
             org_id: data.orgId,
             name: data.name,
+            asset_code: data.assetCode,
             total_quantity: data.totalQuantity,
         });
         setOrg("assets", assets => [...assets, created]);
@@ -202,7 +206,7 @@ export const DashboardBody: Component<{
     };
 
     const handleUpdateAsset = async (
-        updated: Pick<OrganizationAssetEditForm, 'name' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>
+        updated: Pick<OrganizationAssetEditForm, 'name' | 'assetCode' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>
     ) => {
         const assetId = selectedAssetId();
         if (!assetId) return;
@@ -211,6 +215,7 @@ export const DashboardBody: Component<{
             org_id: org.id,
             asset_id: assetId,
             name: updated.name,
+            asset_code: updated.assetCode,
             total_quantity: updated.totalQuantity,
             current_quantity: updated.currentQuantity,
             delete_asset: updated.deleteAsset,

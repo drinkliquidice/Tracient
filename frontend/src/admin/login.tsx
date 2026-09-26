@@ -12,7 +12,6 @@ import { backendRequest, saveToken} from '@/functional/utils';
 
 import showPasswordIcon from '@/admin/components/eye.svg';
 import hidePasswordIcon from '@/admin/components/noEye.svg';
-import { NavMenu } from '@/components/AppHeader';
 import { useNavigate } from '@solidjs/router';
 
 const SideBrandCard: Component = () => (
@@ -202,10 +201,7 @@ const FormCard: Component = () => {
 };
 
 const LoginPage: Component = () => (
-    <div class="relative flex min-h-screen font-sans bg-bg text-text">
-        <div class="absolute top-5 left-5 z-30">
-            <NavMenu tone="surface" />
-        </div>
+    <div class="flex min-h-screen font-sans bg-bg text-text">
         <SideBrandCard />
         <FormCard />
     </div>

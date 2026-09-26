@@ -22,6 +22,7 @@ export interface OrganizationMemberData {
 export interface OrganizationAssetData {
     id: string
     name: string
+    assetCode: string
     totalQuantity: number
     currentQuantity: number
     endpoint: string
@@ -46,6 +47,7 @@ export interface AddMemberFormData {
 export interface AddAssetFormData {
     name: string;
     orgId: string;
+    assetCode: string;
     totalQuantity: number;
 }
 
@@ -65,6 +67,7 @@ export interface OrganizationAssetEditForm {
     orgId: string
     id: string
     name: string
+    assetCode: string
     totalQuantity: number
     currentQuantity: number
     deleteAsset: boolean

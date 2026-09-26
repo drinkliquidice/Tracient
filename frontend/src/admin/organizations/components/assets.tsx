@@ -10,11 +10,13 @@ import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/fun
 export const AssetModal: Component<{
     asset: OrganizationAssetData;
     onClose: () => void;
-    onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>) => Promise<void>;
+    onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'assetCode' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>) => Promise<void>;
 }> = (props) => {
-    const qrUrl = () => qrCodeUrl(props.asset.endpoint);
+    const qrPayload = () => props.asset.assetCode || props.asset.endpoint;
+    const qrUrl = () => qrCodeUrl(qrPayload());
 
     const [name, setName] = createSignal(props.asset.name);
+    const [assetCode, setAssetCode] = createSignal(props.asset.assetCode);
     const [totalQuantity, setTotalQuantity] = createSignal(props.asset.totalQuantity);
     const [currentQuantity, setCurrentQuantity] = createSignal(props.asset.currentQuantity);
     const [deleteAsset, setDeleteAsset] = createSignal(false);
@@ -26,6 +28,7 @@ export const AssetModal: Component<{
         const id = props.asset.id;
         if (prevId !== id) {
             setName(props.asset.name);
+            setAssetCode(props.asset.assetCode);
             setTotalQuantity(props.asset.totalQuantity);
             setCurrentQuantity(props.asset.currentQuantity);
             setDeleteAsset(false);
@@ -37,12 +40,13 @@ export const AssetModal: Component<{
 
     const dirty = () =>
         name() !== props.asset.name ||
+        assetCode() !== props.asset.assetCode ||
         totalQuantity() !== props.asset.totalQuantity ||
         currentQuantity() !== props.asset.currentQuantity ||
         deleteAsset() !== false;
 
     const handleSave = async () => {
-        if (!name().trim() || totalQuantity() <= 0) {
+        if (!name().trim() || !assetCode().trim() || totalQuantity() <= 0) {
             setSaveError('All fields are required.');
             return;
         }
@@ -56,6 +60,7 @@ export const AssetModal: Component<{
         try {
             await props.onSave({
                 name: name().trim(),
+                assetCode: assetCode().trim(),
                 totalQuantity: totalQuantity(),
                 currentQuantity: currentQuantity(),
                 deleteAsset: deleteAsset(),
@@ -108,12 +113,12 @@ export const AssetModal: Component<{
                             />
                         </div>
                         <span class="font-mono text-xs text-text/30 tracking-wide break-all text-center">
-                            {props.asset.endpoint}
+                            {qrPayload()}
                         </span>
                         <button
                             type="button"
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
-                            onClick={() => openQrImageTab(props.asset.endpoint, props.asset.name)}
+                            onClick={() => openQrImageTab(qrPayload(), props.asset.name)}
                         >
                             Download PNG
                         </button>
@@ -122,6 +127,16 @@ export const AssetModal: Component<{
                     {/* RIGHT — Edit form */}
                     <div class="flex flex-col gap-4 px-7 py-7">
                         <span class="font-mono text-xs tracking-widest text-text/40 uppercase">Edit Details</span>
+
+                        <div class="flex flex-col gap-1">
+                            <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Asset Code</label>
+                            <input
+                                class={inputBase}
+                                value={assetCode()}
+                                onInput={e => setAssetCode(e.currentTarget.value)}
+                                disabled={saving()}
+                            />
+                        </div>
 
                         <div class="flex flex-col gap-1">
                             <label class="font-mono text-xs tracking-widest text-text/30 uppercase">Current Quantity</label>
@@ -217,10 +232,15 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
             class="flex items-center justify-between px-4 py-3 mx-1 bg-surface border border-text/8 rounded-sm hover:border-accent/40 hover:bg-accent/5 transition-all duration-150 group cursor-pointer"
             onClick={props.onClick}
         >
-            <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
-                {props.asset.name}
-            </span>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors truncate">
+                    {props.asset.name}
+                </span>
+                <span class="font-mono text-xs text-text/30 tracking-wide truncate">
+                    {props.asset.assetCode}
+                </span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
                 <span class="font-mono text-xs text-text/40 tracking-wide">
                     {props.asset.currentQuantity}/{props.asset.totalQuantity}
                 </span>
@@ -254,13 +274,14 @@ export const AssetCard: Component<{ asset: OrganizationAssetData; onClick: () =>
 
 export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetFormData) => Promise<void> }> = (props) => {
     const [name, setName] = createSignal('');
+    const [assetCode, setAssetCode] = createSignal('');
     const [totalQuantity, setTotalQuantity] = createSignal(1);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal('');
     const [success, setSuccess] = createSignal(false);
 
     const handleSubmit = async () => {
-        if (!name().trim() || !totalQuantity()) {
+        if (!name().trim() || !assetCode().trim() || !totalQuantity()) {
             setError('All fields are required.');
             return;
         }
@@ -271,9 +292,11 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
             await props.onAdd({
                 name: name().trim(),
                 orgId: props.orgId,
+                assetCode: assetCode().trim(),
                 totalQuantity: totalQuantity(),
             });
             setName('');
+            setAssetCode('');
             setTotalQuantity(1);
             setSuccess(true);
             setTimeout(() => setSuccess(false), 2500);
@@ -293,6 +316,16 @@ export const AddAssetForm: Component<{ orgId: string; onAdd: (data: AddAssetForm
                     placeholder="Book"
                     value={name()}
                     onInput={e => setName(e.currentTarget.value)}
+                    disabled={loading()}
+                />
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="font-mono text-xs tracking-widest text-text/40 uppercase">Asset Code</label>
+                <input
+                    class={inputBase}
+                    placeholder="BK-001"
+                    value={assetCode()}
+                    onInput={e => setAssetCode(e.currentTarget.value)}
                     disabled={loading()}
                 />
             </div>
@@ -383,7 +416,7 @@ export const AddAssetsCsvForm: Component<{
     return (
         <div class="flex flex-col gap-3 mx-3 py-2">
             <p class="font-mono text-xs text-text/40 tracking-wide leading-relaxed">
-                Columns: name (or asset_name), total_quantity (or quantity).
+                Columns (in order): asset_code, asset_name, total_quantity.
             </p>
 
             <input
