@@ -51,23 +51,34 @@ export const openQrImageTab = (data: string, name: string) => {
     tab.document.close();
 };
 
-export type QrSheetMember = { name: string; endpoint: string };
+export type QrSheetItem = { name: string; endpoint: string };
 
-export const openMemberQrSheet = (members: QrSheetMember[]) => {
-    if (!members.length) return;
+export const openMemberQrSheet = (members: QrSheetItem[]) => {
+    openQrSheet(members, 'Member QR Codes');
+};
 
-    const pages: QrSheetMember[][] = [];
-    for (let i = 0; i < members.length; i += QR_SHEET_CAPACITY) {
-        pages.push(members.slice(i, i + QR_SHEET_CAPACITY));
+export const openAssetQrSheet = (assets: QrSheetItem[]) => {
+    openQrSheet(assets, 'Asset QR Codes');
+};
+
+/** @deprecated Use QrSheetItem */
+export type QrSheetMember = QrSheetItem;
+
+const openQrSheet = (items: QrSheetItem[], title: string) => {
+    if (!items.length) return;
+
+    const pages: QrSheetItem[][] = [];
+    for (let i = 0; i < items.length; i += QR_SHEET_CAPACITY) {
+        pages.push(items.slice(i, i + QR_SHEET_CAPACITY));
     }
 
-    const pagesHtml = pages.map(pageMembers => {
-        const cells = pageMembers.map(member => {
-            const title = escapeHtml(member.name);
-            const src = qrCodeUrl(member.endpoint, 300);
+    const pagesHtml = pages.map(pageItems => {
+        const cells = pageItems.map(item => {
+            const label = escapeHtml(item.name);
+            const src = qrCodeUrl(item.endpoint, 300);
             return `<div class="cell">
-  <img src="${src}" alt="${title} QR" width="300" height="300" />
-  <span class="label">${title}</span>
+  <img src="${src}" alt="${label} QR" width="300" height="300" />
+  <span class="label">${label}</span>
 </div>`;
         }).join('\n');
         return `<section class="page">${cells}</section>`;
@@ -80,7 +91,7 @@ export const openMemberQrSheet = (members: QrSheetMember[]) => {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Member QR Codes</title>
+<title>${escapeHtml(title)}</title>
 <style>
   @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; }

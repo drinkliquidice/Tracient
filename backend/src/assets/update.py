@@ -4,11 +4,12 @@ import logging
 logger = logging.getLogger(__name__)
 from fastapi import HTTPException
 from utils import APIRequestModel
-from src.assets.datadef import AssetDocument
+from src.assets.datadef import AssetDocument, AssetGroupDocument
+from src.assets.create import assert_asset_code_available, group_to_interface
+from src.assets.groups import load_group_copies, resolve_org_asset_group
 from src.organizations.datadef import OrganizationDocument
-from src.assets.create import assert_asset_code_available, asset_to_interface
 from src.organizations.interface import OrganizationAssetData
-from beanie.odm.fields import PydanticObjectId
+
 
 class UpdateAssetForm(APIRequestModel):
     org_id: str
@@ -16,58 +17,123 @@ class UpdateAssetForm(APIRequestModel):
     name: str
     asset_code: str
     total_quantity: int
-    current_quantity: int
+    current_quantity: int | None = None
     delete_asset: bool
 
+
+async def _delete_asset_group(
+    org: OrganizationDocument,
+    group: AssetGroupDocument,
+) -> None:
+    copies = await load_group_copies(group)
+    for copy in copies:
+        try:
+            await copy.delete()
+        except Exception as e:
+            logger.error(f"Failed to delete asset copy {copy.id}: {e}", exc_info=True)
+            raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to delete asset")
+
+    await group.delete()
+    try:
+        await org.update({"$pull": {"assets": group.id}})
+    except Exception as pull_err:
+        logger.error(f"Failed to remove asset group from org, restoring: {pull_err}", exc_info=True)
+        # Best-effort restore of group shell; copies already gone
+        await group.insert()
+        raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to delete asset")
+
+
+async def _resize_group_copies(
+    group: AssetGroupDocument,
+    copies: list[AssetDocument],
+    new_total: int,
+    name: str,
+) -> list[AssetDocument]:
+    current_total = len(copies)
+    if new_total == current_total:
+        for copy in copies:
+            if copy.name != name:
+                copy.name = name
+                await copy.save()
+        return copies
+
+    if new_total > current_total:
+        added = [
+            AssetDocument.assemble(name=name, group_id=group.id)
+            for _ in range(new_total - current_total)
+        ]
+        await AssetDocument.insert_many(added)
+        copies = copies + added
+    else:
+        available = [c for c in copies if not c.checked_out]
+        to_remove_count = current_total - new_total
+        if len(available) < to_remove_count:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST,
+                detail=(
+                    f"Cannot reduce quantity to {new_total}: "
+                    f"only {len(available)} available copies (not checked out)"
+                ),
+            )
+        remove = available[-to_remove_count:]
+        remove_ids = {c.id for c in remove}
+        for copy in remove:
+            await copy.delete()
+        copies = [c for c in copies if c.id not in remove_ids]
+        for copy in copies:
+            if copy.name != name:
+                copy.name = name
+                await copy.save()
+
+    group.assets = [c.id for c in copies]
+    group.sync_quantities_from_copies(copies)
+    return copies
+
+
 async def update_asset(form: UpdateAssetForm) -> OrganizationAssetData | None:
-    asset = await AssetDocument.get(form.asset_id)
-    if asset is None:
+    org = await OrganizationDocument.get(form.org_id)
+    if org is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
+
+    group = await resolve_org_asset_group(org, form.asset_id)
+    if group is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail="Asset not found")
 
     try:
         if form.delete_asset:
-            await asset.delete()
-            try:
-                org = await OrganizationDocument.get(form.org_id)
-                if org is None:
-                    raise ValueError(f"Organization {form.org_id} not found")
-                await org.update({"$pull": {"assets": PydanticObjectId(form.asset_id)}})
-            except Exception as pull_err:
-                logger.error(f"Failed to remove asset from org, restoring asset document: {pull_err}", exc_info=True)
-                await asset.insert()
-                raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR, detail="Failed to delete asset")
+            await _delete_asset_group(org, group)
             return None
 
         if form.total_quantity <= 0:
             raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Total quantity must be greater than 0")
-        if form.current_quantity < 0:
-            raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Current quantity cannot be negative")
-        if form.current_quantity > form.total_quantity:
-            raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Current quantity cannot exceed total quantity")
         if not form.asset_code.strip():
             raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Asset code is required")
-
-        org = await OrganizationDocument.get(form.org_id)
-        if org is None:
-            raise HTTPException(HTTPStatus.NOT_FOUND, detail="Organization not found")
 
         await assert_asset_code_available(
             org,
             form.asset_code,
-            exclude_asset_id=form.asset_id,
+            exclude_group_id=str(group.id),
         )
 
-        asset.name = form.name
-        asset.asset_code = form.asset_code.strip()
-        asset.total_quantity = form.total_quantity
-        asset.current_quantity = form.current_quantity
-        asset.checked_out = form.current_quantity < form.total_quantity
-        asset.quantity = None
-        await asset.save()
-        refreshed = await AssetDocument.get(form.asset_id)
+        copies = await load_group_copies(group)
+        copies = await _resize_group_copies(
+            group,
+            copies,
+            form.total_quantity,
+            form.name.strip(),
+        )
+
+        group.name = form.name.strip()
+        group.asset_code = form.asset_code.strip()
+        group.assets = [c.id for c in copies]
+        group.sync_quantities_from_copies(copies)
+        await group.save()
+
+        refreshed = await AssetGroupDocument.get(group.id)
         if refreshed is None:
             raise HTTPException(HTTPStatus.NOT_FOUND, detail="Asset not found")
-        return asset_to_interface(refreshed)
+        refreshed_copies = await load_group_copies(refreshed)
+        return group_to_interface(refreshed, refreshed_copies)
 
     except HTTPException:
         raise

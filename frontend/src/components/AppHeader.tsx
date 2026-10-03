@@ -12,7 +12,7 @@ const ADMIN_LINKS: NavLink[] = [
     { label: 'Check-In', href: '/admin/check-in-dashboard' },
     { label: 'QR Sign-In', href: '/admin/signin' },
     { label: 'Circulation', href: '/admin/circulation' },
-    { label: 'Create Organization', href: '/admin/organization/create' },
+    { label: 'Print QRs', href: '/admin/print-qr' },
 ];
 
 export const NavMenu: Component<{
@@ -49,7 +49,7 @@ export const NavMenu: Component<{
     });
 
     return (
-        <div class="relative z-20" ref={rootRef}>
+        <div class="relative z-50" ref={rootRef}>
             <button
                 type="button"
                 class="flex items-center gap-2 font-mono text-sm tracking-[0.2em] uppercase transition-colors"
@@ -70,7 +70,7 @@ export const NavMenu: Component<{
             <Show when={open()}>
                 <div
                     role="menu"
-                    class="absolute left-0 top-full mt-3 min-w-56 bg-surface border border-text/10 rounded-sm shadow-2xl py-1.5 overflow-hidden"
+                    class="absolute left-0 top-full mt-3 min-w-56 bg-surface border border-text/10 rounded-sm shadow-2xl py-1.5 z-50"
                 >
                     <For each={links()}>
                         {(link) => {
@@ -112,17 +112,19 @@ export const AppHeader: Component<{
     };
 
     return (
-        <div class="w-full h-20 bg-accent overflow-hidden flex items-center justify-between relative px-2 shrink-0">
+        <div class="w-full h-20 bg-accent flex items-center justify-between relative px-2 shrink-0 z-50">
             <div
-                class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18] pointer-events-none"
+                class="absolute inset-0 overflow-hidden pointer-events-none"
                 aria-hidden="true"
             >
-                {Array.from({ length: 64 }).map((_, i) => (
-                    <div
-                        class="w-0.75 h-0.75 rounded-full bg-text self-center justify-self-center animate-pulse"
-                        style={{ 'animation-delay': `${(i * 0.07) % 3}s` }}
-                    />
-                ))}
+                <div class="absolute inset-0 grid grid-cols-[repeat(32,1fr)] p-3 gap-3 opacity-[0.18]">
+                    {Array.from({ length: 64 }).map((_, i) => (
+                        <div
+                            class="w-0.75 h-0.75 rounded-full bg-text self-center justify-self-center animate-pulse"
+                            style={{ 'animation-delay': `${(i * 0.07) % 3}s` }}
+                        />
+                    ))}
+                </div>
             </div>
 
             <div class="mx-4 sm:mx-7 z-10 h-full flex flex-row gap-4 sm:gap-6 items-center">

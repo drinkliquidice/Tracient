@@ -9,6 +9,8 @@ from src.admin.datadef import AdminUser
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
 from src.assets.datadef import AssetDocument
+from src.assets.groups import load_group_copies, resolve_org_asset_group
+from pydantic import Field
 
 
 class MemberContactData(APIResponseModel):
@@ -30,6 +32,14 @@ class OrganizationMemberData(APIResponseModel):
     assets: list[str]
     endpoint: str
 
+class OrganizationAssetCopyData(APIResponseModel):
+    id: str
+    name: str
+    endpoint: str
+    check_out_time: datetime | None
+    check_in_time: datetime | None
+    checked_out: bool = False
+
 class OrganizationAssetData(APIResponseModel):
     id: str
     name: str
@@ -40,6 +50,7 @@ class OrganizationAssetData(APIResponseModel):
     check_out_time: datetime | None
     check_in_time: datetime | None
     checked_out: bool = False
+    copies: list[OrganizationAssetCopyData] = Field(default_factory=list)
 
 class OrganizationInterfaceData(APIResponseModel):
     name: str
@@ -96,20 +107,44 @@ async def get_dashboard_data(user: AdminUser) -> OrganizationInterfaceData:
             continue
         members_data.append(await member_to_interface(member_doc))
 
-    for asset_id in org_doc.assets:
-        asset_doc = await AssetDocument.get(asset_id)
-        if asset_doc is None:
+    # Re-fetch org in case legacy assets were migrated (assets list rewritten)
+    org_doc = await OrganizationDocument.get(user.organization)
+    if org_doc is None:
+        raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail="Organization not found")
+
+    for asset_id in list(org_doc.assets):
+        group = await resolve_org_asset_group(org_doc, asset_id)
+        if group is None:
             continue
+        copies = await load_group_copies(group)
+        check_out_time = None
+        check_in_time = None
+        for copy in copies:
+            if copy.check_out_time and (check_out_time is None or copy.check_out_time > check_out_time):
+                check_out_time = copy.check_out_time
+            if copy.check_in_time and (check_in_time is None or copy.check_in_time > check_in_time):
+                check_in_time = copy.check_in_time
         assets_data.append(OrganizationAssetData(
-            id=str(asset_doc.id),
-            name=asset_doc.name,
-            asset_code=asset_doc.resolved_asset_code(),
-            total_quantity=asset_doc.resolved_total(),
-            current_quantity=asset_doc.resolved_current(),
-            endpoint=asset_doc.endpoint,
-            check_out_time=asset_doc.check_out_time,
-            check_in_time=asset_doc.check_in_time,
-            checked_out=asset_doc.checked_out
+            id=str(group.id),
+            name=group.name,
+            asset_code=group.resolved_asset_code(),
+            total_quantity=group.total_quantity,
+            current_quantity=group.current_quantity,
+            endpoint=copies[0].endpoint if copies else "",
+            check_out_time=check_out_time,
+            check_in_time=check_in_time,
+            checked_out=group.current_quantity < group.total_quantity,
+            copies=[
+                OrganizationAssetCopyData(
+                    id=str(copy.id),
+                    name=copy.name,
+                    endpoint=copy.endpoint,
+                    check_out_time=copy.check_out_time,
+                    check_in_time=copy.check_in_time,
+                    checked_out=copy.checked_out,
+                )
+                for copy in copies
+            ],
         ))
 
     return OrganizationInterfaceData(
