@@ -11,6 +11,11 @@ from src.organizations.datadef import OrganizationDocument
 from src.organizations.interface import OrganizationMemberData, member_to_interface
 
 
+def _normalize_name(value: str) -> str:
+    """Underscores stand in for spaces within multi-part names (same as CSV import)."""
+    return value.replace("_", " ").strip()
+
+
 class ContactInput(APIRequestModel):
     name: str
     email: str = ""
@@ -29,7 +34,7 @@ class NewMemberForm(APIRequestModel):
     def create_document(self) -> MemberUser:
         contacts = [
             ContactSubDocument(
-                name=c.name.strip(),
+                name=_normalize_name(c.name),
                 email=c.email.strip(),
                 contact_number=c.contact_number.strip(),
                 use_sms=c.use_sms,
@@ -41,7 +46,7 @@ class NewMemberForm(APIRequestModel):
         member_sms = self.use_sms or any(c.use_sms for c in contacts)
         member_email = self.use_email or any(c.use_email for c in contacts)
         return MemberUser.assemble(
-            name=self.name,
+            name=_normalize_name(self.name),
             contacts=contacts,
             use_sms=member_sms,
             use_email=member_email,
@@ -49,7 +54,7 @@ class NewMemberForm(APIRequestModel):
 
 
 async def create_new_member(form: NewMemberForm) -> OrganizationMemberData:
-    if not form.name.strip():
+    if not _normalize_name(form.name):
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="Member name is required")
     if not form.contacts:
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="At least one contact is required")
