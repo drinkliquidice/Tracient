@@ -14,7 +14,6 @@ import {
 } from "./functional/types";
 import { MemberCard, MemberModal, AddMemberForm } from "./components/member";
 import { AssetCard, AssetModal, AddAssetForm, AddAssetsCsvForm } from "./components/assets";
-import { openMemberQrSheet } from "./functional/qr";
 import { useNavigate } from "@solidjs/router";
 
 const ViewToggle: Component<{
@@ -206,7 +205,7 @@ export const DashboardBody: Component<{
     };
 
     const handleUpdateAsset = async (
-        updated: Pick<OrganizationAssetEditForm, 'name' | 'assetCode' | 'totalQuantity' | 'currentQuantity' | 'deleteAsset'>
+        updated: Pick<OrganizationAssetEditForm, 'name' | 'assetCode' | 'totalQuantity' | 'deleteAsset'>
     ) => {
         const assetId = selectedAssetId();
         if (!assetId) return;
@@ -217,7 +216,6 @@ export const DashboardBody: Component<{
             name: updated.name,
             asset_code: updated.assetCode,
             total_quantity: updated.totalQuantity,
-            current_quantity: updated.currentQuantity,
             delete_asset: updated.deleteAsset,
         });
 
@@ -229,12 +227,6 @@ export const DashboardBody: Component<{
             if (idx >= 0) setOrg("assets", idx, reconcile(saved));
         }
         props.refetch();
-    };
-
-    const handlePrintMemberQrs = () => {
-        openMemberQrSheet(
-            filteredMembers().map(m => ({ name: m.name, endpoint: m.endpoint }))
-        );
     };
 
     return (
@@ -290,7 +282,7 @@ export const DashboardBody: Component<{
                         <button
                             type="button"
                             class="shrink-0 px-3 py-2 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text hover:border-accent/40 disabled:opacity-40"
-                            onClick={handlePrintMemberQrs}
+                            onClick={() => navigate('/admin/print-qr')}
                             disabled={filteredMembers().length === 0}
                         >
                             Print QRs

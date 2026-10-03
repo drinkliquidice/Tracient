@@ -11,13 +11,13 @@ from src.api.actions.twilio import twilio_actions_router
 from src.database.mongodb import mongo, set_up_mongo
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
-from src.assets.datadef import AssetDocument
+from src.assets.datadef import AssetDocument, AssetGroupDocument
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_beanie(
         database=mongo, #type: ignore
-        document_models=[AdminUser, OrganizationDocument, MemberUser, AssetDocument]
+        document_models=[AdminUser, OrganizationDocument, MemberUser, AssetDocument, AssetGroupDocument]
     )
     print("Beanie initialized!")
     await set_up_mongo()

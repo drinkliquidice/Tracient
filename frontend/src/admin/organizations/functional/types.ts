@@ -19,6 +19,15 @@ export interface OrganizationMemberData {
     assets: string[]
 }
 
+export interface OrganizationAssetCopyData {
+    id: string
+    name: string
+    endpoint: string
+    checkOutTime: Date | null
+    checkInTime: Date | null
+    checkedOut: boolean
+}
+
 export interface OrganizationAssetData {
     id: string
     name: string
@@ -29,6 +38,7 @@ export interface OrganizationAssetData {
     checkOutTime: Date | null
     checkInTime: Date | null
     checkedOut: boolean
+    copies: OrganizationAssetCopyData[]
 }
 
 export interface OrganizationInterfaceData {
@@ -69,7 +79,6 @@ export interface OrganizationAssetEditForm {
     name: string
     assetCode: string
     totalQuantity: number
-    currentQuantity: number
     deleteAsset: boolean
 }
 

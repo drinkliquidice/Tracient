@@ -12,6 +12,7 @@ const MemberTapPage = lazy(() => import('@/user/index'));
 const SignInPage = lazy(() => import('@/admin/organizations/signin'));
 const CheckInDashboardPage = lazy(() => import('@/admin/check-in-dashboard'));
 const CirculationPage = lazy(() => import('@/assets/index'));
+const PrintQrPage = lazy(() => import('@/admin/print-qr'));
 
 const AuthWrapper: ParentComponent = (props) => {
     const navigate = useNavigate();
@@ -40,7 +41,8 @@ export const mountApp = () =>
                     <Route path="/member/:id" component={MemberTapPage} /> 
                     <Route path="/signin" component={SignInPage} />
                     <Route path="/check-in-dashboard" component={CheckInDashboardPage} />
-                    <Route path="/circulation" component={CirculationPage} /> 
+                    <Route path="/circulation" component={CirculationPage} />
+                    <Route path="/print-qr" component={PrintQrPage} />
                 </Route>
             </Router>
         ),
