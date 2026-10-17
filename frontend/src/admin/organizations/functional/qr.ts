@@ -8,6 +8,12 @@ export const QR_SHEET_COLS = 4;
 export const QR_SHEET_ROWS = 6;
 export const QR_SHEET_CAPACITY = QR_SHEET_COLS * QR_SHEET_ROWS;
 
+/** Brother QL-800 DK continuous paper (2.4" / 62mm wide), one QR per label. */
+export const QL800_LABEL_WIDTH_IN = 2.4;
+export const QL800_LABEL_HEIGHT_IN = 2.7;
+export const QL800_QR_SIDE_IN = 1.85;
+export const QL800_SHEET_CAPACITY = 1;
+
 export const qrCodeUrl = (data: string, sizePx = QR_SOURCE_PX) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${sizePx}x${sizePx}&margin=0&data=${encodeURIComponent(data)}`;
 

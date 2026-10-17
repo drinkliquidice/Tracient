@@ -8,6 +8,10 @@ import {
     OrganizationMemberData,
 } from '@/admin/organizations/functional/types';
 import {
+    QL800_LABEL_HEIGHT_IN,
+    QL800_LABEL_WIDTH_IN,
+    QL800_QR_SIDE_IN,
+    QL800_SHEET_CAPACITY,
     QR_SHEET_CAPACITY,
     QR_SHEET_COLS,
     QR_SHEET_ROWS,
@@ -15,6 +19,7 @@ import {
 } from '@/admin/organizations/functional/qr';
 
 type Kind = 'members' | 'assets';
+type PaperFormat = 'a4' | 'ql800';
 
 type PrintableItem = {
     key: string;
@@ -62,13 +67,22 @@ const assetItems = (assets: OrganizationAssetData[]): PrintableItem[] => {
     return items;
 };
 
-const chunkPages = (items: PrintableItem[]) => {
+const sheetCapacity = (paper: PaperFormat) =>
+    paper === 'ql800' ? QL800_SHEET_CAPACITY : QR_SHEET_CAPACITY;
+
+const chunkPages = (items: PrintableItem[], paper: PaperFormat) => {
+    const capacity = sheetCapacity(paper);
     const pages: PrintableItem[][] = [];
-    for (let i = 0; i < items.length; i += QR_SHEET_CAPACITY) {
-        pages.push(items.slice(i, i + QR_SHEET_CAPACITY));
+    for (let i = 0; i < items.length; i += capacity) {
+        pages.push(items.slice(i, i + capacity));
     }
     return pages;
 };
+
+const paperLabel = (paper: PaperFormat) =>
+    paper === 'ql800'
+        ? `QL-800 · ${QL800_LABEL_WIDTH_IN}" · 1 per label`
+        : `A4 · ${QR_SHEET_COLS}×${QR_SHEET_ROWS} per sheet`;
 
 const CheckboxMark: Component<{ checked: boolean }> = (props) => (
     <span
@@ -100,6 +114,7 @@ const PrintQrPage: Component = () => {
     const [loading, setLoading] = createSignal(true);
     const [error, setError] = createSignal('');
     const [kind, setKind] = createSignal<Kind>('members');
+    const [paper, setPaper] = createSignal<PaperFormat>('a4');
     const [query, setQuery] = createSignal('');
     const [selected, setSelected] = createSignal<Record<string, boolean>>({});
 
@@ -140,7 +155,9 @@ const PrintQrPage: Component = () => {
         filtered().filter(item => selected()[item.key]).length
     );
 
-    const pages = createMemo(() => chunkPages(selectedItems()));
+    const pages = createMemo(() => chunkPages(selectedItems(), paper()));
+    const isQl800 = createMemo(() => paper() === 'ql800');
+    const unitLabel = createMemo(() => (isQl800() ? 'label' : 'sheet'));
 
     const toggle = (key: string) => {
         setSelected(prev => ({ ...prev, [key]: !prev[key] }));
@@ -169,11 +186,11 @@ const PrintQrPage: Component = () => {
         window.print();
     };
 
-    return (
-        <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
-            <style>{`
+    const printStyles = createMemo(() => {
+        if (isQl800()) {
+            return `
                 @media print {
-                    @page { size: A4 portrait; margin: 0; }
+                    @page { size: ${QL800_LABEL_WIDTH_IN}in ${QL800_LABEL_HEIGHT_IN}in; margin: 0; }
                     html, body {
                         margin: 0 !important;
                         padding: 0 !important;
@@ -196,16 +213,16 @@ const PrintQrPage: Component = () => {
                         margin: 0 !important;
                     }
                     .print-page {
-                        width: 210mm;
-                        height: 297mm;
-                        padding: 8mm;
+                        width: ${QL800_LABEL_WIDTH_IN}in;
+                        height: ${QL800_LABEL_HEIGHT_IN}in;
+                        padding: 0.12in;
                         margin: 0;
                         box-shadow: none !important;
                         page-break-after: always;
                         break-after: page;
                         display: grid;
-                        grid-template-columns: repeat(${QR_SHEET_COLS}, 1fr);
-                        grid-template-rows: repeat(${QR_SHEET_ROWS}, 1fr);
+                        grid-template-columns: 1fr;
+                        grid-template-rows: 1fr;
                         overflow: hidden;
                         background: #fff;
                     }
@@ -216,13 +233,13 @@ const PrintQrPage: Component = () => {
                 }
                 @media screen {
                     .print-page {
-                        width: 210mm;
-                        height: 297mm;
-                        padding: 8mm;
-                        margin: 0 auto 16px;
+                        width: ${QL800_LABEL_WIDTH_IN}in;
+                        height: ${QL800_LABEL_HEIGHT_IN}in;
+                        padding: 0.12in;
+                        margin: 0 auto 12px;
                         display: grid;
-                        grid-template-columns: repeat(${QR_SHEET_COLS}, 1fr);
-                        grid-template-rows: repeat(${QR_SHEET_ROWS}, 1fr);
+                        grid-template-columns: 1fr;
+                        grid-template-rows: 1fr;
                         overflow: hidden;
                         background: #fff;
                         color: #111;
@@ -234,33 +251,130 @@ const PrintQrPage: Component = () => {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    gap: 1.2mm;
-                    padding: 1mm;
+                    gap: 0.08in;
+                    padding: 0;
                     min-height: 0;
                     min-width: 0;
                     overflow: hidden;
                 }
                 .print-cell img {
-                    width: 32mm;
-                    height: 32mm;
+                    width: ${QL800_QR_SIDE_IN}in;
+                    height: ${QL800_QR_SIDE_IN}in;
                     max-width: 100%;
-                    max-height: 70%;
+                    max-height: 78%;
                     object-fit: contain;
                     flex-shrink: 0;
                 }
                 .print-cell .label {
                     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                    font-size: 7pt;
-                    line-height: 1.1;
+                    font-size: 9pt;
+                    line-height: 1.15;
                     text-align: center;
                     max-width: 100%;
-                    max-height: 8mm;
+                    max-height: 0.4in;
                     overflow: hidden;
                     white-space: nowrap;
                     text-overflow: ellipsis;
                     color: #111;
                 }
-            `}</style>
+            `;
+        }
+
+        return `
+            @media print {
+                @page { size: A4 portrait; margin: 0; }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: #fff !important;
+                    color: #111 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                .no-print { display: none !important; }
+                .print-root {
+                    display: block !important;
+                    background: #fff !important;
+                    color: #111 !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    position: static !important;
+                }
+                .print-sheets-wrap {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                }
+                .print-page {
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 8mm;
+                    margin: 0;
+                    box-shadow: none !important;
+                    page-break-after: always;
+                    break-after: page;
+                    display: grid;
+                    grid-template-columns: repeat(${QR_SHEET_COLS}, 1fr);
+                    grid-template-rows: repeat(${QR_SHEET_ROWS}, 1fr);
+                    overflow: hidden;
+                    background: #fff;
+                }
+                .print-page:last-child {
+                    page-break-after: auto;
+                    break-after: auto;
+                }
+            }
+            @media screen {
+                .print-page {
+                    width: 210mm;
+                    height: 297mm;
+                    padding: 8mm;
+                    margin: 0 auto 16px;
+                    display: grid;
+                    grid-template-columns: repeat(${QR_SHEET_COLS}, 1fr);
+                    grid-template-rows: repeat(${QR_SHEET_ROWS}, 1fr);
+                    overflow: hidden;
+                    background: #fff;
+                    color: #111;
+                    box-shadow: 0 1px 6px rgba(0,0,0,0.15);
+                }
+            }
+            .print-cell {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 1.2mm;
+                padding: 1mm;
+                min-height: 0;
+                min-width: 0;
+                overflow: hidden;
+            }
+            .print-cell img {
+                width: 32mm;
+                height: 32mm;
+                max-width: 100%;
+                max-height: 70%;
+                object-fit: contain;
+                flex-shrink: 0;
+            }
+            .print-cell .label {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 7pt;
+                line-height: 1.1;
+                text-align: center;
+                max-width: 100%;
+                max-height: 8mm;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                color: #111;
+            }
+        `;
+    });
+
+    return (
+        <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
+            <style>{printStyles()}</style>
 
             <div class="no-print shrink-0">
                 <AppHeader title="PRINT QRS" />
@@ -289,7 +403,8 @@ const PrintQrPage: Component = () => {
                                         {data()!.name}
                                     </span>
                                     <span class="font-mono text-xs text-text/35 tracking-wide">
-                                        {selectedItems().length} selected · {pages().length || 0} sheet{pages().length === 1 ? '' : 's'}
+                                        {selectedItems().length} selected · {pages().length || 0}{' '}
+                                        {unitLabel()}{pages().length === 1 ? '' : 's'}
                                     </span>
                                 </div>
                                 <button
@@ -300,6 +415,37 @@ const PrintQrPage: Component = () => {
                                 >
                                     Print
                                 </button>
+                            </div>
+
+                            <div class="flex flex-col gap-1.5">
+                                <span class="font-mono text-[10px] tracking-widest uppercase text-text/35">
+                                    Paper
+                                </span>
+                                <div class="flex items-center border border-text/10 rounded-sm overflow-hidden">
+                                    <button
+                                        type="button"
+                                        class="flex-1 px-3 py-2 font-mono text-xs tracking-widest uppercase transition-colors"
+                                        classList={{
+                                            'bg-accent text-text': paper() === 'a4',
+                                            'bg-transparent text-text/35 hover:text-text/60': paper() !== 'a4',
+                                        }}
+                                        onClick={() => setPaper('a4')}
+                                    >
+                                        A4 sheet
+                                    </button>
+                                    <div class="w-px h-4 bg-text/10" />
+                                    <button
+                                        type="button"
+                                        class="flex-1 px-3 py-2 font-mono text-xs tracking-widest uppercase transition-colors"
+                                        classList={{
+                                            'bg-accent text-text': paper() === 'ql800',
+                                            'bg-transparent text-text/35 hover:text-text/60': paper() !== 'ql800',
+                                        }}
+                                        onClick={() => setPaper('ql800')}
+                                    >
+                                        QL-800 2.4"
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="flex items-center border border-text/10 rounded-sm overflow-hidden">
@@ -395,11 +541,11 @@ const PrintQrPage: Component = () => {
                     <div class="print-root flex flex-col min-h-0 bg-[#e8e8e8] lg:max-h-[calc(100vh-5rem)] overflow-y-auto">
                         <div class="no-print px-5 py-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-[#e8e8e8]/z-10">
                             <span class="font-mono text-xs tracking-widest text-black/40 uppercase">
-                                Print preview · A4 · {QR_SHEET_COLS}×{QR_SHEET_ROWS} per sheet
+                                Print preview · {paperLabel(paper())}
                             </span>
                             <span class="font-mono text-xs text-black/35">
                                 {selectedItems().length
-                                    ? `${pages().length} page${pages().length === 1 ? '' : 's'}`
+                                    ? `${pages().length} ${unitLabel()}${pages().length === 1 ? '' : 's'}`
                                     : 'Select QR codes to preview'}
                             </span>
                         </div>

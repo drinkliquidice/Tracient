@@ -88,9 +88,19 @@ export const MemberModal: Component<{
         return id;
     });
 
+    // Read contact fields through the store proxy (not unwrap) so edits re-run this check.
+    const contactsSnapshot = () =>
+        contacts.map(c => ({
+            name: c.name,
+            email: c.email,
+            contactNumber: c.contactNumber,
+            useSms: !!c.useSms,
+            useEmail: !!c.useEmail,
+        }));
+
     const dirty = () =>
-        JSON.stringify(unwrap(contacts)) !== JSON.stringify(seedContacts(props.member)) ||
-        deleteUser() !== false;
+        JSON.stringify(contactsSnapshot()) !== JSON.stringify(seedContacts(props.member)) ||
+        deleteUser();
 
     const handleSave = async () => {
         const cleaned = cleanedContacts(unwrap(contacts));
