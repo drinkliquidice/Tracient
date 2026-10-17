@@ -379,6 +379,19 @@ export const AddMemberForm: Component<{ orgId: string; onAdd: (data: AddMemberFo
                 disabled={loading()}
             />
 
+            <CheckRow
+                checked={useSms()}
+                label="SMS notifications"
+                disabled={loading()}
+                onToggle={() => setUseSms(v => !v)}
+            />
+            <CheckRow
+                checked={useEmail()}
+                label="Email notifications"
+                disabled={loading()}
+                onToggle={() => setUseEmail(v => !v)}
+            />
+
             {error() && (
                 <p class="font-mono text-xs text-red-400/80 tracking-wide">{error()}</p>
             )}
