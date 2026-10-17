@@ -1,17 +1,21 @@
 from __future__ import annotations
 from datetime import datetime
+from typing import Annotated
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from settings import settings
-from utils import PyObjectId
+from utils import PyObjectId, coerce_object_id_list
+
+
+ObjectIdList = Annotated[list[PyObjectId], BeforeValidator(coerce_object_id_list)]
 
 
 class ContactSubDocument(BaseModel):
-    name: str
+    name: str = ""
     email: str = ""
-    contact_number: str
+    contact_number: str = ""
     use_sms: bool = False
     use_email: bool = False
 
@@ -20,7 +24,7 @@ class MemberUser(Document):
     name: str
     contacts: list[ContactSubDocument] = Field(default_factory=list)
     endpoint: str
-    assets: list[PyObjectId] = Field(default_factory=list)
+    assets: ObjectIdList = Field(default_factory=list)
     use_sms: bool | None = None
     use_email: bool = False
     # Legacy combined notification flag

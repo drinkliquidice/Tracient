@@ -17,6 +17,8 @@ import {
     QR_SHEET_ROWS,
     qrCodeUrl,
 } from '@/admin/organizations/functional/qr';
+import { compareByLastName, formatLastFirst } from '@/functional/names';
+import { compareByAssetCode, formatAssetQrLabel } from '@/functional/assetCodes';
 
 type Kind = 'members' | 'assets';
 type PaperFormat = 'a4' | 'ql800';
@@ -29,38 +31,38 @@ type PrintableItem = {
     groupLabel?: string;
 };
 
-const byName = (a: { name: string }, b: { name: string }) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-
 const memberItems = (members: OrganizationMemberData[]): PrintableItem[] =>
-    [...members].sort(byName).map(m => ({
+    [...members].sort(compareByLastName).map(m => ({
         key: `member:${m.id}`,
-        name: m.name,
+        name: formatLastFirst(m.name),
         endpoint: m.endpoint,
         kind: 'member' as const,
     }));
 
 const assetItems = (assets: OrganizationAssetData[]): PrintableItem[] => {
     const items: PrintableItem[] = [];
-    for (const group of [...assets].sort(byName)) {
+    for (const group of [...assets].sort(compareByAssetCode)) {
         const copies = group.copies ?? [];
         if (copies.length === 0 && group.endpoint) {
             items.push({
                 key: `asset:${group.id}`,
-                name: group.name,
+                name: formatAssetQrLabel(group.assetCode),
                 endpoint: group.endpoint,
                 kind: 'asset',
-                groupLabel: group.assetCode,
+                groupLabel: group.name,
             });
             continue;
         }
         copies.forEach((copy, index) => {
             items.push({
                 key: `asset:${copy.id}`,
-                name: copies.length > 1 ? `${group.name} #${index + 1}` : group.name,
+                name: formatAssetQrLabel(group.assetCode, {
+                    copyIndex: index,
+                    copyCount: copies.length,
+                }),
                 endpoint: copy.endpoint || copy.id,
                 kind: 'asset',
-                groupLabel: group.assetCode,
+                groupLabel: group.name,
             });
         });
     }
