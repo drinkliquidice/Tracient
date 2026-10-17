@@ -1,4 +1,6 @@
 import { backendRequest, getToken } from "@/functional/utils";
+import { compareByLastName } from "@/functional/names";
+import { compareByAssetCode } from "@/functional/assetCodes";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { on } from "solid-js";
@@ -99,12 +101,9 @@ export const DashboardBody: Component<{
     const selectedAsset = () =>
         org.assets.find(a => a.id === selectedAssetId()) ?? null;
 
-    const byName = (a: { name: string }, b: { name: string }) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-
     const filteredMembers = createMemo(() => {
         const q = memberQuery().trim().toLowerCase();
-        const users = [...org.users].sort(byName);
+        const users = [...org.users].sort(compareByLastName);
         if (!q) return users;
         return users.filter(m => {
             if (m.name.toLowerCase().includes(q)) return true;
@@ -118,7 +117,7 @@ export const DashboardBody: Component<{
 
     const sortedAssets = createMemo(() => {
         const q = assetQuery().trim().toLowerCase();
-        const assets = [...org.assets].sort(byName);
+        const assets = [...org.assets].sort(compareByAssetCode);
         if (!q) return assets;
         return assets.filter(a =>
             a.name.toLowerCase().includes(q) ||

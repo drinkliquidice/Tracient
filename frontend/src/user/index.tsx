@@ -1,6 +1,7 @@
 import { Component, createResource, Match, Switch } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { backendRequest, getToken } from '@/functional/utils';
+import { formatLastFirst } from '@/functional/names';
 import { AppHeader } from '@/components/AppHeader';
 
 const SuccessView: Component<{ action: string; member: string; timestamp: string }> = (props) => (
@@ -18,7 +19,7 @@ const SuccessView: Component<{ action: string; member: string; timestamp: string
         </div>
         <div class="flex flex-col items-center gap-1 text-center">
             <span class="font-mono text-xl tracking-[0.15em] text-text">
-                {props.member}
+                {formatLastFirst(props.member)}
             </span>
             <span class="font-mono text-sm tracking-[0.2em] text-text/50 uppercase">
                 Signed {props.action} · {new Date(props.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

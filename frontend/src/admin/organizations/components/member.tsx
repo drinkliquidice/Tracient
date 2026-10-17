@@ -10,6 +10,7 @@ import {
 } from "@/admin/organizations/functional/types";
 import { cleanedContacts, ContactCarousel, contactsAreComplete } from "./contacts";
 import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/functional/qr";
+import { formatLastFirst } from "@/functional/names";
 
 const CheckRow: Component<{
     checked: boolean;
@@ -152,7 +153,7 @@ export const MemberModal: Component<{
 
                 <div class="flex items-center justify-between px-7 py-5 border-b border-text/8">
                     <span class="font-mono font-bold text-sm tracking-widest text-text uppercase">
-                        {props.member.name}
+                        {formatLastFirst(props.member.name)}
                     </span>
                     <button
                         class="font-mono text-xs tracking-widest text-text/40 hover:text-text transition-colors uppercase"
@@ -168,7 +169,7 @@ export const MemberModal: Component<{
                         <div class="p-3 bg-white rounded-sm">
                             <img
                                 src={qrUrl()}
-                                alt={`QR code for ${props.member.name}`}
+                                alt={`QR code for ${formatLastFirst(props.member.name)}`}
                                 class="block"
                                 style={{ width: `${QR_SIDE_CM}cm`, height: `${QR_SIDE_CM}cm` }}
                             />
@@ -179,7 +180,7 @@ export const MemberModal: Component<{
                         <button
                             type="button"
                             class="w-full py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 text-center"
-                            onClick={() => openQrImageTab(props.member.endpoint, props.member.name)}
+                            onClick={() => openQrImageTab(props.member.endpoint, formatLastFirst(props.member.name))}
                         >
                             Download PNG
                         </button>
@@ -284,7 +285,7 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
             onClick={props.onClick}
         >
             <span class="font-mono text-sm tracking-wide text-text group-hover:text-text transition-colors">
-                {props.member.name}
+                {formatLastFirst(props.member.name)}
             </span>
             <div class="flex items-center gap-2">
                 {latestActivity()

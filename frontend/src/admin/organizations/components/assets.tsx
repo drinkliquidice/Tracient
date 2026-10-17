@@ -7,6 +7,7 @@ import {
     OrganizationAssetEditForm
 } from "@/admin/organizations/functional/types";
 import { openQrImageTab, openAssetQrSheet, qrCodeUrl } from "@/admin/organizations/functional/qr";
+import { formatAssetQrLabel } from "@/functional/assetCodes";
 
 const formatDate = (date: Date | string | null) => {
     if (!date) return '—';
@@ -18,11 +19,15 @@ const formatDate = (date: Date | string | null) => {
 const CopyRow: Component<{
     copy: OrganizationAssetCopyData;
     index: number;
-    groupName: string;
+    assetCode: string;
+    copyCount: number;
 }> = (props) => {
     const qrPayload = () => props.copy.endpoint || props.copy.id;
     const qrUrl = () => qrCodeUrl(qrPayload(), 200);
-    const label = () => `${props.groupName} #${props.index + 1}`;
+    const label = () => formatAssetQrLabel(props.assetCode, {
+        copyIndex: props.index,
+        copyCount: props.copyCount,
+    });
 
     return (
         <div class="flex items-center gap-4 px-3 py-3 border border-text/8 rounded-sm bg-bg/40">
@@ -128,9 +133,13 @@ export const AssetModal: Component<{
     };
 
     const handlePrintAll = () => {
+        const count = copies().length;
         openAssetQrSheet(
             copies().map((copy, index) => ({
-                name: `${props.asset.name} #${index + 1}`,
+                name: formatAssetQrLabel(props.asset.assetCode, {
+                    copyIndex: index,
+                    copyCount: count,
+                }),
                 endpoint: copy.endpoint || copy.id,
             }))
         );
@@ -282,7 +291,8 @@ export const AssetModal: Component<{
                                         <CopyRow
                                             copy={copy}
                                             index={index()}
-                                            groupName={props.asset.name}
+                                            assetCode={props.asset.assetCode}
+                                            copyCount={copies().length}
                                         />
                                     )}
                                 </For>
@@ -498,7 +508,7 @@ export const AddAssetsCsvForm: Component<{
     return (
         <div class="flex flex-col gap-3 mx-3 py-2">
             <p class="font-mono text-xs text-text/40 tracking-wide leading-relaxed">
-                Columns (in order): asset_code, asset_name, total_quantity. Each row creates a group with one QR per copy.
+                Required columns: asset_code, asset_name, total_quantity. Extra columns (e.g. borrowed notes) are ignored. Each row creates a group with one QR per copy.
             </p>
 
             <input

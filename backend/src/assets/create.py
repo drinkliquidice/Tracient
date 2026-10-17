@@ -97,28 +97,91 @@ async def assert_asset_code_available(
             raise HTTPException(HTTPStatus.CONFLICT, detail="Asset code already in use")
 
 
-def _csv_dict_reader(csv_bytes: bytes) -> csv.DictReader:
+_ASSET_NAME_KEYS = ("asset_name", "name")
+_ASSET_CODE_KEYS = ("asset_code", "code")
+_ASSET_QTY_KEYS = ("total_quantity", "quantity")
+
+
+def _normalize_header_cell(value: str | None) -> str:
+    return (value or "").strip().casefold()
+
+
+def _is_blank_csv_row(row: list[str]) -> bool:
+    return not any((cell or "").strip() for cell in row)
+
+
+def _header_field_map(header_row: list[str]) -> dict[str, int] | None:
+    """Map logical field → column index. Ignores unknown columns (e.g. borrowed notes)."""
+    indexes: dict[str, int] = {}
+    for idx, cell in enumerate(header_row):
+        key = _normalize_header_cell(cell)
+        if not key:
+            continue
+        if key in _ASSET_NAME_KEYS and "name" not in indexes:
+            indexes["name"] = idx
+        elif key in _ASSET_CODE_KEYS and "code" not in indexes:
+            indexes["code"] = idx
+        elif key in _ASSET_QTY_KEYS and "qty" not in indexes:
+            indexes["qty"] = idx
+    if "name" in indexes or "code" in indexes or "qty" in indexes:
+        return indexes
+    return None
+
+
+def _cell_at(row: list[str], index: int | None) -> str:
+    if index is None or index < 0 or index >= len(row):
+        return ""
+    return (row[index] or "").strip()
+
+
+def _iter_asset_csv_rows(csv_bytes: bytes):
+    """Yield data rows after locating the asset header; only known columns are used."""
     text = csv_bytes.decode("utf-8-sig")
     sample = text[:4096]
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t")
     except csv.Error:
         dialect = csv.excel
-    return csv.DictReader(StringIO(text), dialect=dialect)
+
+    reader = csv.reader(StringIO(text), dialect=dialect)
+    field_map: dict[str, int] | None = None
+    for row in reader:
+        if _is_blank_csv_row(row):
+            continue
+        if field_map is None:
+            field_map = _header_field_map(row)
+            if field_map is not None:
+                continue
+            # Not a header — skip stray preamble rows from spreadsheet exports.
+            continue
+
+        yield {
+            "name": _cell_at(row, field_map.get("name")),
+            "code": _cell_at(row, field_map.get("code")),
+            "qty": _cell_at(row, field_map.get("qty")),
+        }
+
+    if field_map is None:
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST,
+            detail="Assets CSV must include a header with asset_code, asset_name, and/or total_quantity",
+        )
 
 
 def parse_asset_groups_from_csv(csv_bytes: bytes) -> list[tuple[str, str, int]]:
-    """Return list of (name, asset_code, total_quantity) rows."""
-    reader = _csv_dict_reader(csv_bytes)
+    """Return list of (name, asset_code, total_quantity) rows.
+
+    Extra columns (borrowed notes, blank leading columns, etc.) are ignored.
+    Leading blank / preamble rows before the header are skipped.
+    """
     rows: list[tuple[str, str, int]] = []
     seen_codes: set[str] = set()
-    for row in reader:
-        name = (row.get("asset_name") or row.get("name") or "").strip() or MISSING_TEXT
-        code = (row.get("asset_code") or row.get("code") or "").strip()
-        qty_raw = (row.get("total_quantity") or row.get("quantity") or "").strip()
+    for row in _iter_asset_csv_rows(csv_bytes):
+        name = row["name"] or MISSING_TEXT
+        code = row["code"]
+        qty_raw = row["qty"]
         if name == MISSING_TEXT and not qty_raw and not code:
-            if not any((v or "").strip() for v in row.values()):
-                continue
+            continue
         if not qty_raw:
             total_quantity = DEFAULT_ASSET_QUANTITY
         else:

@@ -14,6 +14,7 @@ import { createStore, reconcile } from 'solid-js/store';
 import { useNavigate } from '@solidjs/router';
 
 import { backendRequest, getToken } from '@/functional/utils';
+import { compareByLastName, formatLastFirst, lastNameLetter } from '@/functional/names';
 import {
     OrganizationInterfaceData,
     OrganizationMemberData,
@@ -32,19 +33,6 @@ const NoOrganizationView: Component = () => (
         </a>
     </div>
 );
-
-const lastNameLetter = (name: string): string => {
-    const trimmed = name.trim();
-    if (!trimmed) return '#';
-    if (trimmed.includes(',')) {
-        const last = trimmed.split(',')[0].trim();
-        return (last.charAt(0) || '#').toUpperCase();
-    }
-    const parts = trimmed.split(/\s+/);
-    const last = parts[parts.length - 1] || '';
-    const letter = last.charAt(0).toUpperCase();
-    return /[A-Z]/.test(letter) ? letter : '#';
-};
 
 const isSignedIn = (member: OrganizationMemberData): boolean => {
     const { signInTime, signOutTime } = member;
@@ -150,7 +138,7 @@ const MemberRow: Component<{
             <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                 <div class="flex items-center gap-2">
                     <span class="font-mono text-sm tracking-wide text-text truncate">
-                        {props.member.name}
+                        {formatLastFirst(props.member.name)}
                     </span>
                     <div
                         class="w-1.5 h-1.5 rounded-full shrink-0"
@@ -217,14 +205,11 @@ const CheckInBody: Component<{
         { defer: true }
     ));
 
-    const byName = (a: { name: string }, b: { name: string }) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-
     const filteredMembers = createMemo(() => {
         const q = query().trim().toLowerCase();
         const letterFilter = letter();
         return [...org.users]
-            .sort(byName)
+            .sort(compareByLastName)
             .filter(m => {
                 if (letterFilter && lastNameLetter(m.name) !== letterFilter) return false;
                 if (!q) return true;
@@ -279,7 +264,7 @@ const CheckInBody: Component<{
         const online = isSignedIn(member);
         const duplicate = (action === 'in' && online) || (action === 'out' && !online);
         if (duplicate) {
-            setPending({ memberId: member.id, memberName: member.name, action });
+            setPending({ memberId: member.id, memberName: formatLastFirst(member.name), action });
             return;
         }
         void applyAction(member.id, action);

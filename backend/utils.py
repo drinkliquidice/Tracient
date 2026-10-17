@@ -1,4 +1,5 @@
 from bson import ObjectId
+from bson.errors import InvalidId
 from pydantic import BaseModel, ConfigDict, AliasGenerator, GetCoreSchemaHandler
 from pydantic.alias_generators import to_camel
 from pydantic_core import core_schema
@@ -25,3 +26,20 @@ class PyObjectId(ObjectId):
             lambda v: ObjectId(v) if not isinstance(v, ObjectId) else v,
             serialization=core_schema.to_string_ser_schema(),
         )
+
+
+def coerce_object_id_list(value) -> list:
+    """Tolerate null / manual Mongo edits: null → [], drop invalid entries."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return []
+    cleaned = []
+    for item in value:
+        if item is None or item == "":
+            continue
+        try:
+            cleaned.append(item if isinstance(item, ObjectId) else ObjectId(item))
+        except (InvalidId, TypeError, ValueError):
+            continue
+    return cleaned
