@@ -34,7 +34,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://tracient.pages.dev",
-        "https://tracient.drinkliquidice.dev"
+        "https://tracient.drinkliquidice.dev",
         "https://e10fa18e.tracient.pages.dev",
     ],
     allow_credentials=True,
