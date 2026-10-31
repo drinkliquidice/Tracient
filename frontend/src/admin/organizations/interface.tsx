@@ -56,6 +56,13 @@ const contactsPayload = (contacts: MemberContactData[]) =>
         useEmail: c.useEmail,
     }));
 
+const isInCenter = (member: OrganizationMemberData): boolean => {
+    const { signInTime, signOutTime } = member;
+    if (!signInTime) return false;
+    if (!signOutTime) return true;
+    return new Date(signInTime) > new Date(signOutTime);
+};
+
 export const DashboardBody: Component<{
     data: () => OrganizationInterfaceData;
     refetch: () => void;
@@ -73,6 +80,7 @@ export const DashboardBody: Component<{
     );
     const [view, setView] = createSignal<'members' | 'assets'>('members');
     const [memberQuery, setMemberQuery] = createSignal('');
+    const [inCenterOnly, setInCenterOnly] = createSignal(false);
     const [assetQuery, setAssetQuery] = createSignal('');
     const [selectedMemberId, setSelectedMemberId] = createSignal<string | null>(null);
     const [selectedAssetId, setSelectedAssetId] = createSignal<string | null>(null);
@@ -103,17 +111,22 @@ export const DashboardBody: Component<{
 
     const filteredMembers = createMemo(() => {
         const q = memberQuery().trim().toLowerCase();
-        const users = [...org.users].sort(compareByLastName);
-        if (!q) return users;
-        return users.filter(m => {
-            if (m.name.toLowerCase().includes(q)) return true;
-            return m.contacts.some(c =>
-                c.name.toLowerCase().includes(q) ||
-                c.email.toLowerCase().includes(q) ||
-                c.contactNumber.toLowerCase().includes(q)
-            );
-        });
+        const onlyInCenter = inCenterOnly();
+        return [...org.users]
+            .sort(compareByLastName)
+            .filter(m => {
+                if (onlyInCenter && !isInCenter(m)) return false;
+                if (!q) return true;
+                if (m.name.toLowerCase().includes(q)) return true;
+                return m.contacts.some(c =>
+                    c.name.toLowerCase().includes(q) ||
+                    c.email.toLowerCase().includes(q) ||
+                    c.contactNumber.toLowerCase().includes(q)
+                );
+            });
     });
+
+    const inCenterCount = createMemo(() => org.users.filter(isInCenter).length);
 
     const sortedAssets = createMemo(() => {
         const q = assetQuery().trim().toLowerCase();
@@ -261,7 +274,7 @@ export const DashboardBody: Component<{
                     <div class="flex-1 h-px bg-text/8" />
                     <span class="font-mono text-xs text-text/30">
                         {view() === 'members' ? filteredMembers().length : sortedAssets().length}
-                        {view() === 'members' && memberQuery().trim()
+                        {view() === 'members' && (memberQuery().trim() || inCenterOnly())
                             ? ` / ${org.users.length}`
                             : view() === 'assets' && assetQuery().trim()
                                 ? ` / ${org.assets.length}`
@@ -278,6 +291,18 @@ export const DashboardBody: Component<{
                             value={memberQuery()}
                             onInput={e => setMemberQuery(e.currentTarget.value)}
                         />
+                        <button
+                            type="button"
+                            class="shrink-0 px-3 py-2 border rounded-sm font-mono text-xs tracking-widest uppercase transition-colors"
+                            classList={{
+                                'bg-accent border-accent text-text': inCenterOnly(),
+                                'border-text/10 text-text/50 hover:text-text hover:border-accent/40': !inCenterOnly(),
+                            }}
+                            onClick={() => setInCenterOnly(v => !v)}
+                            title="Show only students currently in the center"
+                        >
+                            In center{inCenterCount() > 0 ? ` · ${inCenterCount()}` : ''}
+                        </button>
                         <button
                             type="button"
                             class="shrink-0 px-3 py-2 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text hover:border-accent/40 disabled:opacity-40"

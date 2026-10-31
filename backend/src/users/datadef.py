@@ -20,6 +20,43 @@ class ContactSubDocument(BaseModel):
     use_email: bool = False
 
 
+class AttendanceRecord(BaseModel):
+    """One visit to the center."""
+
+    sign_in_time: datetime
+    sign_out_time: datetime | None = None
+
+
+class BorrowedAssetRecord(BaseModel):
+    """One asset borrow / return cycle."""
+
+    asset_id: PydanticObjectId
+    asset_name: str = ""
+    check_out_time: datetime
+    check_in_time: datetime | None = None
+
+
+class MemberRecord(Document):
+    """Historical attendance and borrow log for a member. Not wired into flows yet."""
+
+    member_id: PydanticObjectId
+    name: str
+    attendance: list[AttendanceRecord] = Field(default_factory=list)
+    borrowed_assets: list[BorrowedAssetRecord] = Field(default_factory=list)
+
+    class Settings:
+        name = "memberRecords"
+
+    @staticmethod
+    def assemble(member_id: PydanticObjectId, name: str) -> MemberRecord:
+        return MemberRecord(
+            member_id=member_id,
+            name=name,
+            attendance=[],
+            borrowed_assets=[],
+        )
+
+
 class MemberUser(Document):
     name: str
     contacts: list[ContactSubDocument] = Field(default_factory=list)
