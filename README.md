@@ -14,6 +14,7 @@ Frontend:
 Backend:
 - MongoDB for storage
 - Beanie for document formatting
-- Twilio for notifications
+- Twilio for SMS notifications
+- SendGrid for email notifications
 
 Hosted on Cloudflare Pages and Render
