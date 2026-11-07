@@ -1,4 +1,5 @@
 import { backendRequest, getToken } from "@/functional/utils";
+import { isMemberSignedIn } from "@/functional/attendance";
 import { compareByLastName, formatLastFirst } from "@/functional/names";
 import { compareByAssetCode } from "@/functional/assetCodes";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
@@ -58,12 +59,7 @@ const contactsPayload = (contacts: MemberContactData[]) =>
         useEmail: c.useEmail,
     }));
 
-const isInCenter = (member: OrganizationMemberData): boolean => {
-    const { signInTime, signOutTime } = member;
-    if (!signInTime) return false;
-    if (!signOutTime) return true;
-    return new Date(signInTime) > new Date(signOutTime);
-};
+const isInCenter = isMemberSignedIn;
 
 const memberMatchesQuery = (member: OrganizationMemberData, q: string): boolean => {
     if (!q) return true;
