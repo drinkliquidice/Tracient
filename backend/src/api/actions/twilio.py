@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import asyncio
 import logging
 from fastapi import APIRouter, HTTPException, Query
@@ -25,6 +25,16 @@ def _happened_today(dt: datetime | None, now: datetime) -> bool:
     if dt is None:
         return False
     return eastern_date(dt) == eastern_date(now)
+
+
+def _eastern_date(dt: datetime) -> date:
+    return ensure_aware_utc(dt).astimezone(TZ).date()
+
+
+def _happened_today(dt: datetime | None, now: datetime) -> bool:
+    if dt is None:
+        return False
+    return _eastern_date(dt) == _eastern_date(now)
 
 
 def _apply_action(member: MemberUser, action: str, now: datetime) -> None:

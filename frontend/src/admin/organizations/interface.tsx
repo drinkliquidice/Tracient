@@ -104,6 +104,49 @@ const Pagination: Component<{
     );
 };
 
+const memberMatchesQuery = (member: OrganizationMemberData, q: string): boolean => {
+    if (!q) return true;
+    const name = member.name ?? '';
+    return (
+        name.toLowerCase().includes(q) ||
+        formatLastFirst(name).toLowerCase().includes(q)
+    );
+};
+
+const Pagination: Component<{
+    page: number;
+    total: number;
+    limit: number;
+    onChange: (page: number) => void;
+}> = (props) => {
+    const totalPages = () => Math.max(1, Math.ceil(props.total / Math.max(props.limit, 1)));
+    return (
+        <Show when={props.total > props.limit && props.limit > 0}>
+            <div class="flex items-center justify-between mt-3 mx-1">
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text disabled:opacity-30"
+                    disabled={props.page <= 1}
+                    onClick={() => props.onChange(props.page - 1)}
+                >
+                    Prev
+                </button>
+                <span class="font-mono text-xs text-text/30">
+                    Page {props.page} / {totalPages()}
+                </span>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text disabled:opacity-30"
+                    disabled={props.page >= totalPages()}
+                    onClick={() => props.onChange(props.page + 1)}
+                >
+                    Next
+                </button>
+            </div>
+        </Show>
+    );
+};
+
 export const DashboardBody: Component<{
     meta: OrganizationMetaData;
 }> = (props) => {
