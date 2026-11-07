@@ -26,6 +26,8 @@ export interface OrganizationAssetCopyData {
     checkOutTime: Date | null
     checkInTime: Date | null
     checkedOut: boolean
+    borrowedByMemberId?: string | null
+    borrowedByMemberName?: string | null
 }
 
 export interface OrganizationAssetData {
@@ -46,6 +48,26 @@ export interface OrganizationInterfaceData {
     id: string
     users: OrganizationMemberData[]
     assets: OrganizationAssetData[]
+}
+
+export interface OrganizationMetaData {
+    id: string
+    name: string
+}
+
+export interface PaginatedMembersData {
+    items: OrganizationMemberData[]
+    total: number
+    page: number
+    limit: number
+    inCenterCount: number
+}
+
+export interface PaginatedAssetsData {
+    items: OrganizationAssetData[]
+    total: number
+    page: number
+    limit: number
 }
 
 export interface AddMemberFormData {

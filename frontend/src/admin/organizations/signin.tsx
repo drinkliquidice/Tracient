@@ -12,6 +12,7 @@ import QrScanner from "qr-scanner";
 import { SignInResponse } from "./functional/types";
 import { getMemberIdFromEndpoint } from "./functional/functional";
 import { AppHeader } from "@/components/AppHeader";
+import { formatEasternTime } from "@/functional/time";
 import { useNavigate } from "@solidjs/router";
 
 const QRCodeReader: Component<{
@@ -36,11 +37,11 @@ const QRCodeReader: Component<{
     });
 
     return (
-        <div class="w-96 justify-center">
+        <div class="w-full">
             <Show when={error()}>
                 <p>{error()}</p>
             </Show>
-            <video ref={videoRef} class="w-full h-auto rounded" />
+            <video ref={videoRef} class="w-full h-auto max-h-[75vh] object-cover rounded" />
         </div>
     );
 
@@ -57,34 +58,46 @@ export const SignInPage: Component = () => {
     }
 
     const onScan = (data: string) => {
-        if (data === lastScanned()) return; 
+        if (data === lastScanned()) return;
         setEndpointUrl(data);
         setLastScanned(data);
-    }
+    };
 
     const [result] = createResource(
         endpointUrl,
         async (url) => {
             if (!url) return null;
-            return await backendRequest<SignInResponse>('GET', `/member/${url}`, tok!);
+            try {
+                return await backendRequest<SignInResponse>('GET', `/member/${url}`, tok!);
+            } catch (e) {
+                // Allow the same QR to be scanned again after an error (e.g. already signed in today).
+                setLastScanned('');
+                throw e;
+            }
         }
     );
 
     return (
         <div class="flex flex-col min-h-screen font-sans bg-bg text-text">
             <AppHeader title="QR SIGN-IN" />
-            <div class="flex flex-1 items-center justify-center">
-                <div class="flex flex-col items-center gap-4">
+            <div class="flex flex-1 items-center justify-center w-full px-4">
+                <div class="flex flex-col items-center gap-4 w-full max-w-3xl">
                     <QRCodeReader onScan={onScan} />
-                    <Show when={result()}>
+                    <Show when={result.error}>
+                        <div class="p-6 mx-4 bg-red-100 text-red-800 rounded inline-block">
+                            <p class="font-bold">Unable to sign</p>
+                            <p>{(result.error as Error)?.message ?? 'Please try again.'}</p>
+                        </div>
+                    </Show>
+                    <Show when={!result.error && result()}>
                         <div class="p-6 mx-4 bg-green-100 text-green-800 rounded inline-block">
                             <p class="font-bold">{result()!.member}</p>
-                            <p>{result()!.action} at {new Date(result()!.timestamp).toLocaleTimeString()}</p>
+                            <p>{result()!.action} at {formatEasternTime(result()!.timestamp)}</p>
                         </div>
                     </Show>
                 </div>
             </div>
-        </div>  
+        </div>
     );
 };
 

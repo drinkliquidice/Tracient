@@ -11,7 +11,10 @@ from utils import APIRequestModel
 from src.assets.datadef import AssetDocument, AssetGroupDocument
 from src.assets.groups import load_group_copies, resolve_org_asset_group
 from src.organizations.datadef import OrganizationDocument
-from src.organizations.interface import OrganizationAssetCopyData, OrganizationAssetData
+from src.organizations.interface import (
+    OrganizationAssetData,
+    group_to_interface,
+)
 
 
 class NewAssetForm(APIRequestModel):
@@ -35,46 +38,9 @@ MISSING_TEXT = "TEMP"
 DEFAULT_ASSET_QUANTITY = 1
 
 
-def copy_to_interface(asset_doc: AssetDocument) -> OrganizationAssetCopyData:
-    return OrganizationAssetCopyData(
-        id=str(asset_doc.id),
-        name=asset_doc.name,
-        endpoint=asset_doc.endpoint,
-        check_out_time=asset_doc.check_out_time,
-        check_in_time=asset_doc.check_in_time,
-        checked_out=asset_doc.checked_out,
-    )
-
-
-def group_to_interface(
-    group: AssetGroupDocument,
-    copies: list[AssetDocument],
-) -> OrganizationAssetData:
-    check_out_time = None
-    check_in_time = None
-    for copy in copies:
-        if copy.check_out_time and (check_out_time is None or copy.check_out_time > check_out_time):
-            check_out_time = copy.check_out_time
-        if copy.check_in_time and (check_in_time is None or copy.check_in_time > check_in_time):
-            check_in_time = copy.check_in_time
-
-    return OrganizationAssetData(
-        id=str(group.id),
-        name=group.name,
-        asset_code=group.resolved_asset_code(),
-        total_quantity=group.total_quantity,
-        current_quantity=group.current_quantity,
-        endpoint=copies[0].endpoint if copies else "",
-        check_out_time=check_out_time,
-        check_in_time=check_in_time,
-        checked_out=group.current_quantity < group.total_quantity,
-        copies=[copy_to_interface(c) for c in copies],
-    )
-
-
 async def asset_group_to_interface(group: AssetGroupDocument) -> OrganizationAssetData:
     copies = await load_group_copies(group)
-    return group_to_interface(group, copies)
+    return group_to_interface(group, copies, include_copies=True)
 
 
 async def assert_asset_code_available(

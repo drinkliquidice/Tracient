@@ -7,17 +7,18 @@ import {
     createEffect,
     createMemo,
     createSignal,
-    on,
     onCleanup,
 } from 'solid-js';
 import { createStore, reconcile } from 'solid-js/store';
 import { useNavigate } from '@solidjs/router';
 
 import { backendRequest, getToken } from '@/functional/utils';
-import { compareByLastName, formatLastFirst, lastNameLetter } from '@/functional/names';
+import { formatLastFirst, lastNameLetter } from '@/functional/names';
+import { formatEasternTime, isEasternToday } from '@/functional/time';
 import {
-    OrganizationInterfaceData,
     OrganizationMemberData,
+    OrganizationMetaData,
+    PaginatedMembersData,
     SignInResponse,
 } from '@/admin/organizations/functional/types';
 import { AppHeader } from '@/components/AppHeader';
@@ -57,71 +58,7 @@ const formatActivity = (member: OrganizationMemberData): string => {
     } else {
         return 'Never';
     }
-    return `${label} · ${latest.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-};
-
-type PendingAction = {
-    memberId: string;
-    memberName: string;
-    action: 'in' | 'out';
-};
-
-const ConfirmModal: Component<{
-    pending: PendingAction;
-    busy: boolean;
-    onConfirm: () => void;
-    onCancel: () => void;
-}> = (props) => {
-    const handleBackdrop = (e: MouseEvent) => {
-        if ((e.target as HTMLElement).dataset.backdrop && !props.busy) props.onCancel();
-    };
-
-    const alreadyLabel = () =>
-        props.pending.action === 'in' ? 'already signed in' : 'already signed out';
-
-    const actionLabel = () =>
-        props.pending.action === 'in' ? 'sign in again' : 'sign out again';
-
-    return (
-        <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-            data-backdrop="true"
-            onClick={handleBackdrop}
-        >
-            <div class="bg-surface border border-text/10 rounded-sm shadow-2xl w-full max-w-md mx-4 p-6 flex flex-col gap-5">
-                <div class="flex flex-col gap-2">
-                    <span class="font-mono font-bold text-sm tracking-widest text-text uppercase">
-                        Confirm duplicate
-                    </span>
-                    <p class="font-mono text-sm text-text/60 leading-relaxed">
-                        <span class="text-text">{props.pending.memberName}</span>
-                        {' '}is {alreadyLabel()}. Confirm that you want to {actionLabel()}?
-                    </p>
-                </div>
-                <div class="flex items-center justify-end gap-3">
-                    <button
-                        type="button"
-                        class="px-4 py-2.5 font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text transition-colors disabled:opacity-40"
-                        onClick={props.onCancel}
-                        disabled={props.busy}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        class="px-4 py-2.5 bg-accent text-text font-mono text-xs tracking-widest uppercase rounded-sm hover:bg-accent/85 active:scale-[0.98] transition-all duration-150 disabled:opacity-45 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-28"
-                        onClick={props.onConfirm}
-                        disabled={props.busy}
-                    >
-                        {props.busy
-                            ? <span class="w-3.5 h-3.5 border-2 border-text/20 border-t-text rounded-full animate-spin" />
-                            : 'Confirm'
-                        }
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+    return `${label} · ${formatEasternTime(latest)}`;
 };
 
 const MemberRow: Component<{
@@ -132,6 +69,10 @@ const MemberRow: Component<{
 }> = (props) => {
     const online = () => isSignedIn(props.member);
     const busy = () => props.busyId === props.member.id;
+    const signedInToday = () => isEasternToday(props.member.signInTime);
+    const signedOutToday = () => isEasternToday(props.member.signOutTime);
+    const canSignIn = () => !busy() && !signedInToday();
+    const canSignOut = () => !busy() && !signedOutToday();
 
     return (
         <div class="flex items-center gap-3 px-4 py-3 mx-1 bg-surface border border-text/8 rounded-sm">
@@ -158,11 +99,12 @@ const MemberRow: Component<{
                     type="button"
                     class="px-3 py-2 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase transition-colors disabled:opacity-40"
                     classList={{
-                        'text-accent border-accent/40 hover:bg-accent/10': !busy(),
-                        'text-text/40': busy(),
+                        'text-accent border-accent/40 hover:bg-accent/10': canSignIn(),
+                        'text-text/40': !canSignIn(),
                     }}
                     onClick={props.onSignIn}
-                    disabled={busy()}
+                    disabled={!canSignIn()}
+                    title={signedInToday() ? 'Already signed in today' : undefined}
                 >
                     Sign In
                 </button>
@@ -170,11 +112,12 @@ const MemberRow: Component<{
                     type="button"
                     class="px-3 py-2 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase transition-colors disabled:opacity-40"
                     classList={{
-                        'text-text/70 hover:text-text hover:border-text/30': !busy(),
-                        'text-text/40': busy(),
+                        'text-text/70 hover:text-text hover:border-text/30': canSignOut(),
+                        'text-text/40': !canSignOut(),
                     }}
                     onClick={props.onSignOut}
-                    disabled={busy()}
+                    disabled={!canSignOut()}
+                    title={signedOutToday() ? 'Already signed out today' : undefined}
                 >
                     Sign Out
                 </button>
@@ -184,52 +127,42 @@ const MemberRow: Component<{
 };
 
 const CheckInBody: Component<{
-    data: () => OrganizationInterfaceData;
-    refetch: () => void;
+    meta: OrganizationMetaData;
+    initialMembers: OrganizationMemberData[];
 }> = (props) => {
     const tok = getToken();
-    const [org, setOrg] = createStore<OrganizationInterfaceData>(
-        JSON.parse(JSON.stringify(props.data()))
-    );
+    const [members, setMembers] = createStore<OrganizationMemberData[]>([...props.initialMembers]);
     const [query, setQuery] = createSignal('');
     const [letter, setLetter] = createSignal<string | null>(null);
     const [busyId, setBusyId] = createSignal<string | null>(null);
-    const [pending, setPending] = createSignal<PendingAction | null>(null);
     const [error, setError] = createSignal('');
 
-    createEffect(on(
-        () => JSON.stringify(props.data()),
-        (serialized) => {
-            setOrg(reconcile(JSON.parse(serialized), { key: 'id' }));
-        },
-        { defer: true }
-    ));
+    createEffect(() => {
+        setMembers(reconcile(props.initialMembers, { key: 'id' }));
+    });
 
     const filteredMembers = createMemo(() => {
         const q = query().trim().toLowerCase();
         const letterFilter = letter();
-        return [...org.users]
-            .sort(compareByLastName)
-            .filter(m => {
-                if (letterFilter && lastNameLetter(m.name) !== letterFilter) return false;
-                if (!q) return true;
-                if (m.name.toLowerCase().includes(q)) return true;
-                return m.contacts.some(c =>
-                    c.name.toLowerCase().includes(q) ||
-                    c.email.toLowerCase().includes(q) ||
-                    c.contactNumber.toLowerCase().includes(q)
-                );
-            });
+        return members.filter(m => {
+            if (letterFilter && lastNameLetter(m.name) !== letterFilter) return false;
+            if (!q) return true;
+            const name = m.name ?? '';
+            return (
+                name.toLowerCase().includes(q) ||
+                formatLastFirst(name).toLowerCase().includes(q)
+            );
+        });
     });
 
     const availableLetters = createMemo(() => {
-        const set = new Set(org.users.map(m => lastNameLetter(m.name)));
+        const set = new Set(members.map(m => lastNameLetter(m.name)));
         return LETTERS.filter(l => set.has(l));
     });
 
     const applyAction = async (memberId: string, action: 'in' | 'out') => {
         if (!tok || busyId()) return;
-        const member = org.users.find(m => m.id === memberId);
+        const member = members.find(m => m.id === memberId);
         if (!member) return;
 
         setBusyId(memberId);
@@ -242,16 +175,14 @@ const CheckInBody: Component<{
                 return value instanceof Date ? value : new Date(value);
             };
 
-            const idx = org.users.findIndex(m => m.id === memberId);
+            const idx = members.findIndex(m => m.id === memberId);
             if (idx >= 0) {
-                setOrg('users', idx, {
+                setMembers(idx, {
                     signInTime: toDate(result.signInTime ?? (action === 'in' ? result.timestamp : member.signInTime)),
                     signOutTime: toDate(result.signOutTime ?? (action === 'out' ? result.timestamp : member.signOutTime)),
                     lastSignIn: toDate(result.lastSignIn ?? (action === 'in' ? result.timestamp : member.lastSignIn)),
                 });
             }
-            setPending(null);
-            props.refetch();
         } catch (e: any) {
             setError(e?.message ?? 'Failed to update check-in.');
         } finally {
@@ -261,10 +192,12 @@ const CheckInBody: Component<{
 
     const requestAction = (member: OrganizationMemberData, action: 'in' | 'out') => {
         setError('');
-        const online = isSignedIn(member);
-        const duplicate = (action === 'in' && online) || (action === 'out' && !online);
-        if (duplicate) {
-            setPending({ memberId: member.id, memberName: formatLastFirst(member.name), action });
+        if (action === 'in' && isEasternToday(member.signInTime)) {
+            setError(`${formatLastFirst(member.name)} already signed in today.`);
+            return;
+        }
+        if (action === 'out' && isEasternToday(member.signOutTime)) {
+            setError(`${formatLastFirst(member.name)} already signed out today.`);
             return;
         }
         void applyAction(member.id, action);
@@ -272,27 +205,18 @@ const CheckInBody: Component<{
 
     return (
         <div class="flex-1 flex flex-col min-h-0 px-4 py-8 max-w-4xl mx-auto w-full">
-            <Show when={pending()}>
-                <ConfirmModal
-                    pending={pending()!}
-                    busy={busyId() === pending()!.memberId}
-                    onConfirm={() => void applyAction(pending()!.memberId, pending()!.action)}
-                    onCancel={() => { if (!busyId()) setPending(null); }}
-                />
-            </Show>
-
             <div class="flex items-center justify-between mb-6 px-1">
                 <div>
                     <h1 class="font-mono font-bold text-3xl tracking-[0.12em] text-text uppercase">
-                        {org.name}
+                        {props.meta.name}
                     </h1>
                     <p class="font-mono text-xs text-text/40 tracking-wide mt-1">
-                        Manual check-in dashboard
+                        Manual check-in dashboard · once per day
                     </p>
                 </div>
                 <span class="font-mono text-xs text-text/30">
                     {filteredMembers().length}
-                    {(query().trim() || letter()) ? ` / ${org.users.length}` : ''}
+                    {(query().trim() || letter()) ? ` / ${members.length}` : ''}
                 </span>
             </div>
 
@@ -346,7 +270,7 @@ const CheckInBody: Component<{
 
             <div class="flex-1 overflow-y-auto min-h-0 border border-text/8 rounded-sm p-2 flex flex-col gap-1.5 bg-bg/40">
                 <Show
-                    when={org.users.length > 0}
+                    when={members.length > 0}
                     fallback={
                         <div class="flex-1 flex items-center justify-center">
                             <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No members yet</span>
@@ -387,7 +311,8 @@ const CheckInDashboardPage: Component = () => {
         navigateLogin();
     }
 
-    const [pageData, setPageData] = createSignal<OrganizationInterfaceData | undefined>();
+    const [meta, setMeta] = createSignal<OrganizationMetaData | undefined>();
+    const [members, setMembers] = createSignal<OrganizationMemberData[]>([]);
     const [error, setError] = createSignal<{ status?: number } | undefined>();
     const [initialLoading, setInitialLoading] = createSignal(true);
     let inflight = false;
@@ -398,8 +323,12 @@ const CheckInDashboardPage: Component = () => {
         inflight = true;
         if (!silent) setInitialLoading(true);
         try {
-            const next = await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok);
-            setPageData(next);
+            const [nextMeta, membersPage] = await Promise.all([
+                backendRequest<OrganizationMetaData>('GET', '/api/admin/dashboard', tok),
+                backendRequest<PaginatedMembersData>('GET', '/api/admin/members/all', tok),
+            ]);
+            setMeta(nextMeta);
+            setMembers(membersPage.items);
             setError(undefined);
         } catch (e: any) {
             setError(e);
@@ -424,7 +353,7 @@ const CheckInDashboardPage: Component = () => {
         <div class="flex flex-col h-screen font-sans bg-bg text-text overflow-hidden">
             <AppHeader title="CHECK-IN" />
             <Switch>
-                <Match when={initialLoading() && !pageData()}>
+                <Match when={initialLoading() && !meta()}>
                     <div class="flex-1 flex items-center justify-center">
                         <span class="w-6 h-6 border-2 border-text/20 border-t-text rounded-full animate-spin" />
                     </div>
@@ -434,10 +363,10 @@ const CheckInDashboardPage: Component = () => {
                     <NoOrganizationView />
                 </Match>
 
-                <Match when={!!pageData()}>
+                <Match when={!!meta()}>
                     <CheckInBody
-                        data={() => pageData()!}
-                        refetch={() => { void load(true); }}
+                        meta={meta()!}
+                        initialMembers={members()}
                     />
                 </Match>
             </Switch>

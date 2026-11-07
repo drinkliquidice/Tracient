@@ -1,8 +1,7 @@
 import { Component, createEffect, createSignal, Match, onCleanup, Switch } from 'solid-js';
 
-
 import { backendRequest, getToken } from '@/functional/utils';
-import { OrganizationInterfaceData} from '@/admin/organizations/functional/types';
+import { OrganizationMetaData } from '@/admin/organizations/functional/types';
 import { DashboardBody } from './organizations/interface';
 import { AppHeader } from '@/components/AppHeader';
 import { useNavigate } from '@solidjs/router';
@@ -27,7 +26,7 @@ const DashboardPage: Component = () => {
         navigateLogin();
     }
 
-    const [pageData, setPageData] = createSignal<OrganizationInterfaceData | undefined>();
+    const [meta, setMeta] = createSignal<OrganizationMetaData | undefined>();
     const [error, setError] = createSignal<{ status?: number } | undefined>();
     const [initialLoading, setInitialLoading] = createSignal(true);
     let inflight = false;
@@ -38,8 +37,8 @@ const DashboardPage: Component = () => {
         inflight = true;
         if (!silent) setInitialLoading(true);
         try {
-            const next = await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok);
-            setPageData(next);
+            const next = await backendRequest<OrganizationMetaData>('GET', '/api/admin/dashboard', tok);
+            setMeta(next);
             setError(undefined);
         } catch (e: any) {
             setError(e);
@@ -64,20 +63,17 @@ const DashboardPage: Component = () => {
         <div class="flex flex-col h-screen font-sans bg-bg text-text overflow-hidden">
             <AppHeader title="DASHBOARD" />
             <Switch>
-                <Match when={initialLoading() && !pageData()}>
+                <Match when={initialLoading() && !meta()}>
                     <div class="flex-1 flex items-center justify-center">
                         <span class="w-6 h-6 border-2 border-text/20 border-t-text rounded-full animate-spin" />
-                    </div> 
+                    </div>
                 </Match>
 
                 <Match when={error()?.status === 412}>
                     <NoOrganizationView />
                 </Match>
-                <Match when={!!pageData()}>
-                    <DashboardBody
-                        data={() => pageData()!}
-                        refetch={() => { void load(true); }}
-                    />
+                <Match when={!!meta()}>
+                    <DashboardBody meta={meta()!} />
                 </Match>
             </Switch>
         </div>

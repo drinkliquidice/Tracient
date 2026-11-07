@@ -98,11 +98,11 @@ const FormCard: Component = () => {
         setIsSubmitting(true);
         setErrors({ username: undefined, password: undefined, submit: undefined });
         try {
-            const res = await backendRequest<{ token: string }>(
+            const res = await backendRequest<{ token: string; refreshToken?: string; refresh_token?: string }>(
                 'POST', '/api/admin/login', null,
                 { username: form.username, password: form.password }
             );
-            saveToken(res.token);
+            saveToken(res.token, res.refreshToken ?? res.refresh_token);
             navigate('/admin/dashboard');
         } catch (err: unknown) {
             setErrors('submit', err instanceof Error ? err.message : 'Invalid username or password');

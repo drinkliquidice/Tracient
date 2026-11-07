@@ -1,22 +1,24 @@
 import { backendRequest, getToken } from "@/functional/utils";
-import { compareByLastName } from "@/functional/names";
+import { compareByLastName, formatLastFirst } from "@/functional/names";
 import { compareByAssetCode } from "@/functional/assetCodes";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
-import { on } from "solid-js";
 import {
     AddAssetFormData,
     AddMemberFormData,
     MemberContactData,
     OrganizationAssetData,
-    OrganizationInterfaceData,
     OrganizationMemberData,
     OrganizationMemberEditForm,
     OrganizationAssetEditForm,
+    OrganizationMetaData,
+    PaginatedAssetsData,
+    PaginatedMembersData,
 } from "./functional/types";
 import { MemberCard, MemberModal, AddMemberForm } from "./components/member";
 import { AssetCard, AssetModal, AddAssetForm, AddAssetsCsvForm } from "./components/assets";
 import { useNavigate } from "@solidjs/router";
+
+const PAGE_SIZE = 50;
 
 const ViewToggle: Component<{
     view: 'members' | 'assets';
@@ -63,9 +65,51 @@ const isInCenter = (member: OrganizationMemberData): boolean => {
     return new Date(signInTime) > new Date(signOutTime);
 };
 
+const memberMatchesQuery = (member: OrganizationMemberData, q: string): boolean => {
+    if (!q) return true;
+    const name = member.name ?? '';
+    return (
+        name.toLowerCase().includes(q) ||
+        formatLastFirst(name).toLowerCase().includes(q)
+    );
+};
+
+const Pagination: Component<{
+    page: number;
+    total: number;
+    limit: number;
+    onChange: (page: number) => void;
+}> = (props) => {
+    const totalPages = () => Math.max(1, Math.ceil(props.total / Math.max(props.limit, 1)));
+    return (
+        <Show when={props.total > props.limit && props.limit > 0}>
+            <div class="flex items-center justify-between mt-3 mx-1">
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text disabled:opacity-30"
+                    disabled={props.page <= 1}
+                    onClick={() => props.onChange(props.page - 1)}
+                >
+                    Prev
+                </button>
+                <span class="font-mono text-xs text-text/30">
+                    Page {props.page} / {totalPages()}
+                </span>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text disabled:opacity-30"
+                    disabled={props.page >= totalPages()}
+                    onClick={() => props.onChange(props.page + 1)}
+                >
+                    Next
+                </button>
+            </div>
+        </Show>
+    );
+};
+
 export const DashboardBody: Component<{
-    data: () => OrganizationInterfaceData;
-    refetch: () => void;
+    meta: OrganizationMetaData;
 }> = (props) => {
     const navigate = useNavigate();
     const navigateLogin = () => navigate('/login/');
@@ -75,67 +119,167 @@ export const DashboardBody: Component<{
         navigateLogin();
     }
 
-    const [org, setOrg] = createStore<OrganizationInterfaceData>(
-        JSON.parse(JSON.stringify(props.data()))
-    );
+    const [orgId] = createSignal(props.meta.id);
+    const [orgName] = createSignal(props.meta.name);
     const [view, setView] = createSignal<'members' | 'assets'>('members');
+
     const [memberQuery, setMemberQuery] = createSignal('');
     const [inCenterOnly, setInCenterOnly] = createSignal(false);
-    const [assetQuery, setAssetQuery] = createSignal('');
-    const [selectedMemberId, setSelectedMemberId] = createSignal<string | null>(null);
-    const [selectedAssetId, setSelectedAssetId] = createSignal<string | null>(null);
+    const [memberPage, setMemberPage] = createSignal(1);
+    const [allMembers, setAllMembers] = createSignal<OrganizationMemberData[]>([]);
+    const [membersLoading, setMembersLoading] = createSignal(false);
+    const [membersLoaded, setMembersLoaded] = createSignal(false);
 
-    createEffect(on(
-        () => JSON.stringify(props.data()),
-        (serialized) => {
-            setOrg(reconcile(JSON.parse(serialized), { key: "id" }));
-        },
-        { defer: true }
-    ));
+    const [assetQuery, setAssetQuery] = createSignal('');
+    const [assetPage, setAssetPage] = createSignal(1);
+    const [allAssets, setAllAssets] = createSignal<OrganizationAssetData[]>([]);
+    const [assetsLoading, setAssetsLoading] = createSignal(false);
+    const [assetsLoaded, setAssetsLoaded] = createSignal(false);
+
+    const [selectedMemberId, setSelectedMemberId] = createSignal<string | null>(null);
+    const [selectedMember, setSelectedMember] = createSignal<OrganizationMemberData | null>(null);
+    const [selectedAssetId, setSelectedAssetId] = createSignal<string | null>(null);
+    const [selectedAsset, setSelectedAsset] = createSignal<OrganizationAssetData | null>(null);
+    const [detailLoading, setDetailLoading] = createSignal(false);
+
+    const loadMembers = async () => {
+        if (!tok) return;
+        setMembersLoading(true);
+        try {
+            const data = await backendRequest<PaginatedMembersData>(
+                'GET',
+                '/api/admin/members/all',
+                tok,
+            );
+            setAllMembers(data.items);
+            setMembersLoaded(true);
+        } catch (e: any) {
+            if (e?.status === 401) navigateLogin();
+        } finally {
+            setMembersLoading(false);
+        }
+    };
+
+    const loadAssets = async () => {
+        if (!tok) return;
+        setAssetsLoading(true);
+        try {
+            const data = await backendRequest<PaginatedAssetsData>(
+                'GET',
+                '/api/admin/assets?limit=0',
+                tok,
+            );
+            setAllAssets(data.items);
+            setAssetsLoaded(true);
+        } catch (e: any) {
+            if (e?.status === 401) navigateLogin();
+        } finally {
+            setAssetsLoading(false);
+        }
+    };
 
     createEffect(() => {
-        const memberId = selectedMemberId();
-        if (memberId && !org.users.some(m => m.id === memberId)) {
-            setSelectedMemberId(null);
+        if (view() === 'members' && !membersLoaded() && !membersLoading()) {
+            void loadMembers();
         }
-        const assetId = selectedAssetId();
-        if (assetId && !org.assets.some(a => a.id === assetId)) {
-            setSelectedAssetId(null);
+        if (view() === 'assets' && !assetsLoaded() && !assetsLoading()) {
+            void loadAssets();
         }
     });
 
-    const selectedMember = () =>
-        org.users.find(m => m.id === selectedMemberId()) ?? null;
-    const selectedAsset = () =>
-        org.assets.find(a => a.id === selectedAssetId()) ?? null;
+    createEffect(() => {
+        memberQuery();
+        inCenterOnly();
+        setMemberPage(1);
+    });
+
+    createEffect(() => {
+        assetQuery();
+        setAssetPage(1);
+    });
 
     const filteredMembers = createMemo(() => {
         const q = memberQuery().trim().toLowerCase();
         const onlyInCenter = inCenterOnly();
-        return [...org.users]
+        return [...allMembers()]
             .sort(compareByLastName)
             .filter(m => {
                 if (onlyInCenter && !isInCenter(m)) return false;
-                if (!q) return true;
-                if (m.name.toLowerCase().includes(q)) return true;
-                return m.contacts.some(c =>
-                    c.name.toLowerCase().includes(q) ||
-                    c.email.toLowerCase().includes(q) ||
-                    c.contactNumber.toLowerCase().includes(q)
-                );
+                return memberMatchesQuery(m, q);
             });
     });
 
-    const inCenterCount = createMemo(() => org.users.filter(isInCenter).length);
+    const inCenterCount = createMemo(() => allMembers().filter(isInCenter).length);
 
-    const sortedAssets = createMemo(() => {
+    const pagedMembers = createMemo(() => {
+        const start = (memberPage() - 1) * PAGE_SIZE;
+        return filteredMembers().slice(start, start + PAGE_SIZE);
+    });
+
+    const filteredAssets = createMemo(() => {
         const q = assetQuery().trim().toLowerCase();
-        const assets = [...org.assets].sort(compareByAssetCode);
-        if (!q) return assets;
-        return assets.filter(a =>
-            a.name.toLowerCase().includes(q) ||
-            a.assetCode.toLowerCase().includes(q)
-        );
+        return [...allAssets()]
+            .sort(compareByAssetCode)
+            .filter(a =>
+                !q ||
+                a.name.toLowerCase().includes(q) ||
+                a.assetCode.toLowerCase().includes(q)
+            );
+    });
+
+    const pagedAssets = createMemo(() => {
+        const start = (assetPage() - 1) * PAGE_SIZE;
+        return filteredAssets().slice(start, start + PAGE_SIZE);
+    });
+
+    createEffect(() => {
+        const memberId = selectedMemberId();
+        if (!memberId || !tok) {
+            setSelectedMember(null);
+            return;
+        }
+        let cancelled = false;
+        setDetailLoading(true);
+        void backendRequest<OrganizationMemberData>('GET', `/api/admin/members/${memberId}`, tok)
+            .then((detail) => {
+                if (!cancelled) setSelectedMember(detail);
+            })
+            .catch((e: any) => {
+                if (e?.status === 401) navigateLogin();
+                if (!cancelled) {
+                    setSelectedMemberId(null);
+                    setSelectedMember(null);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setDetailLoading(false);
+            });
+        return () => { cancelled = true; };
+    });
+
+    createEffect(() => {
+        const assetId = selectedAssetId();
+        if (!assetId || !tok) {
+            setSelectedAsset(null);
+            return;
+        }
+        let cancelled = false;
+        setDetailLoading(true);
+        void backendRequest<OrganizationAssetData>('GET', `/api/admin/assets/${assetId}`, tok)
+            .then((detail) => {
+                if (!cancelled) setSelectedAsset(detail);
+            })
+            .catch((e: any) => {
+                if (e?.status === 401) navigateLogin();
+                if (!cancelled) {
+                    setSelectedAssetId(null);
+                    setSelectedAsset(null);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setDetailLoading(false);
+            });
+        return () => { cancelled = true; };
     });
 
     const handleAddMember = async (data: AddMemberFormData) => {
@@ -146,8 +290,7 @@ export const DashboardBody: Component<{
             use_sms: data.contacts.some(c => c.useSms),
             use_email: data.contacts.some(c => c.useEmail),
         });
-        setOrg("users", users => [...users, created]);
-        props.refetch();
+        setAllMembers(prev => [{ ...created, assets: [] }, ...prev]);
     };
 
     const handleUpdateMember = async (
@@ -157,7 +300,7 @@ export const DashboardBody: Component<{
         if (!memberId) return;
 
         const saved = await backendRequest<OrganizationMemberData | null>('PATCH', '/api/admin/organization/member/update', tok!, {
-            org_id: org.id,
+            org_id: orgId(),
             member_id: memberId,
             contacts: contactsPayload(updated.contacts),
             use_sms: updated.contacts.some(c => c.useSms),
@@ -166,13 +309,14 @@ export const DashboardBody: Component<{
         });
 
         if (updated.delete_user) {
-            setOrg("users", users => users.filter(m => m.id !== memberId));
+            setAllMembers(prev => prev.filter(m => m.id !== memberId));
             setSelectedMemberId(null);
+            setSelectedMember(null);
         } else if (saved) {
-            const idx = org.users.findIndex(m => m.id === memberId);
-            if (idx >= 0) setOrg("users", idx, reconcile(saved));
+            const lean = { ...saved, assets: [] as string[] };
+            setAllMembers(prev => prev.map(m => m.id === memberId ? lean : m));
+            setSelectedMember(saved);
         }
-        props.refetch();
     };
 
     const handleAddAsset = async (data: AddAssetFormData) => {
@@ -182,13 +326,12 @@ export const DashboardBody: Component<{
             asset_code: data.assetCode,
             total_quantity: data.totalQuantity,
         });
-        setOrg("assets", assets => [...assets, created]);
-        props.refetch();
+        setAllAssets(prev => [{ ...created, copies: [] }, ...prev]);
     };
 
     const handleAddAssetsCsv = async (file: File): Promise<number> => {
         const formData = new FormData();
-        formData.append('org_id', org.id);
+        formData.append('org_id', orgId());
         formData.append('assets_csv', file);
 
         const baseUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5173';
@@ -210,9 +353,8 @@ export const DashboardBody: Component<{
             throw new Error(detail || res.statusText);
         }
 
-        const created = data as OrganizationAssetData[];
-        setOrg("assets", assets => [...assets, ...created]);
-        props.refetch();
+        const created = (data as OrganizationAssetData[]).map(a => ({ ...a, copies: [] }));
+        setAllAssets(prev => [...created, ...prev]);
         return created.length;
     };
 
@@ -223,7 +365,7 @@ export const DashboardBody: Component<{
         if (!assetId) return;
 
         const saved = await backendRequest<OrganizationAssetData | null>('PATCH', '/api/admin/organization/asset/update', tok!, {
-            org_id: org.id,
+            org_id: orgId(),
             asset_id: assetId,
             name: updated.name,
             asset_code: updated.assetCode,
@@ -232,13 +374,34 @@ export const DashboardBody: Component<{
         });
 
         if (updated.deleteAsset) {
-            setOrg("assets", assets => assets.filter(a => a.id !== assetId));
+            setAllAssets(prev => prev.filter(a => a.id !== assetId));
             setSelectedAssetId(null);
+            setSelectedAsset(null);
         } else if (saved) {
-            const idx = org.assets.findIndex(a => a.id === assetId);
-            if (idx >= 0) setOrg("assets", idx, reconcile(saved));
+            const lean = { ...saved, copies: [] };
+            setAllAssets(prev => prev.map(a => a.id === assetId ? lean : a));
+            setSelectedAsset(saved);
         }
-        props.refetch();
+    };
+
+    const handleCheckInCopy = async (copyId: string) => {
+        const assetId = selectedAssetId();
+        if (!assetId || !tok) return;
+
+        await backendRequest('POST', '/api/admin/assets/circulate', tok, {
+            asset_id: copyId,
+            time: new Date().toISOString(),
+            check_out: false,
+        });
+
+        const detail = await backendRequest<OrganizationAssetData>(
+            'GET',
+            `/api/admin/assets/${assetId}`,
+            tok,
+        );
+        setSelectedAsset(detail);
+        const lean = { ...detail, copies: [] };
+        setAllAssets(prev => prev.map(a => a.id === assetId ? lean : a));
     };
 
     return (
@@ -246,15 +409,16 @@ export const DashboardBody: Component<{
             <Show when={selectedMemberId() && selectedMember()}>
                 <MemberModal
                     member={selectedMember()!}
-                    onClose={() => setSelectedMemberId(null)}
+                    onClose={() => { setSelectedMemberId(null); setSelectedMember(null); }}
                     onSave={handleUpdateMember}
                 />
             </Show>
             <Show when={selectedAssetId() && selectedAsset()}>
                 <AssetModal
                     asset={selectedAsset()!}
-                    onClose={() => setSelectedAssetId(null)}
+                    onClose={() => { setSelectedAssetId(null); setSelectedAsset(null); }}
                     onSave={handleUpdateAsset}
+                    onCheckInCopy={handleCheckInCopy}
                 />
             </Show>
 
@@ -262,7 +426,7 @@ export const DashboardBody: Component<{
 
                 <div class="flex items-center justify-between mb-8 py-2 mx-2">
                     <h1 class="font-mono font-bold text-3xl tracking-[0.12em] text-text uppercase">
-                        {org.name}
+                        {orgName()}
                     </h1>
                     <ViewToggle view={view()} onChange={setView} />
                 </div>
@@ -273,12 +437,9 @@ export const DashboardBody: Component<{
                     </span>
                     <div class="flex-1 h-px bg-text/8" />
                     <span class="font-mono text-xs text-text/30">
-                        {view() === 'members' ? filteredMembers().length : sortedAssets().length}
-                        {view() === 'members' && (memberQuery().trim() || inCenterOnly())
-                            ? ` / ${org.users.length}`
-                            : view() === 'assets' && assetQuery().trim()
-                                ? ` / ${org.assets.length}`
-                                : ''}
+                        {view() === 'members'
+                            ? `${filteredMembers().length}${allMembers().length ? ` / ${allMembers().length}` : ''}`
+                            : `${filteredAssets().length}${allAssets().length ? ` / ${allAssets().length}` : ''}`}
                     </span>
                 </div>
 
@@ -307,7 +468,7 @@ export const DashboardBody: Component<{
                             type="button"
                             class="shrink-0 px-3 py-2 border border-text/10 rounded-sm font-mono text-xs tracking-widest uppercase text-text/50 hover:text-text hover:border-accent/40 disabled:opacity-40"
                             onClick={() => navigate('/admin/print-qr')}
-                            disabled={filteredMembers().length === 0}
+                            disabled={allMembers().length === 0}
                         >
                             Print QRs
                         </button>
@@ -330,22 +491,24 @@ export const DashboardBody: Component<{
                     {view() === 'members'
                         ? (
                             <Show
-                                when={org.users.length > 0}
+                                when={!membersLoading()}
                                 fallback={
                                     <div class="flex-1 flex items-center justify-center">
-                                        <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No members yet</span>
+                                        <span class="w-5 h-5 border-2 border-text/20 border-t-text rounded-full animate-spin" />
                                     </div>
                                 }
                             >
                                 <Show
-                                    when={filteredMembers().length > 0}
+                                    when={pagedMembers().length > 0}
                                     fallback={
                                         <div class="flex-1 flex items-center justify-center">
-                                            <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No matches</span>
+                                            <span class="font-mono text-xs text-text/25 tracking-widest uppercase">
+                                                {memberQuery().trim() || inCenterOnly() ? 'No matches' : 'No members yet'}
+                                            </span>
                                         </div>
                                     }
                                 >
-                                    <For each={filteredMembers()}>
+                                    <For each={pagedMembers()}>
                                         {(member) => (
                                             <MemberCard
                                                 member={member}
@@ -353,27 +516,34 @@ export const DashboardBody: Component<{
                                             />
                                         )}
                                     </For>
+                                    <Show when={detailLoading() && selectedMemberId() && !selectedMember()}>
+                                        <div class="flex items-center justify-center py-4">
+                                            <span class="w-4 h-4 border-2 border-text/20 border-t-text rounded-full animate-spin" />
+                                        </div>
+                                    </Show>
                                 </Show>
                             </Show>
                         )
                         : (
                             <Show
-                                when={org.assets.length > 0}
+                                when={!assetsLoading()}
                                 fallback={
                                     <div class="flex-1 flex items-center justify-center">
-                                        <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No assets yet</span>
+                                        <span class="w-5 h-5 border-2 border-text/20 border-t-text rounded-full animate-spin" />
                                     </div>
                                 }
                             >
                                 <Show
-                                    when={sortedAssets().length > 0}
+                                    when={pagedAssets().length > 0}
                                     fallback={
                                         <div class="flex-1 flex items-center justify-center">
-                                            <span class="font-mono text-xs text-text/25 tracking-widest uppercase">No matches</span>
+                                            <span class="font-mono text-xs text-text/25 tracking-widest uppercase">
+                                                {assetQuery().trim() ? 'No matches' : 'No assets yet'}
+                                            </span>
                                         </div>
                                     }
                                 >
-                                    <For each={sortedAssets()}>
+                                    <For each={pagedAssets()}>
                                         {(asset) => (
                                             <AssetCard
                                                 asset={asset}
@@ -386,6 +556,23 @@ export const DashboardBody: Component<{
                         )
                     }
                 </div>
+
+                <Show when={view() === 'members'}>
+                    <Pagination
+                        page={memberPage()}
+                        total={filteredMembers().length}
+                        limit={PAGE_SIZE}
+                        onChange={setMemberPage}
+                    />
+                </Show>
+                <Show when={view() === 'assets'}>
+                    <Pagination
+                        page={assetPage()}
+                        total={filteredAssets().length}
+                        limit={PAGE_SIZE}
+                        onChange={setAssetPage}
+                    />
+                </Show>
             </div>
 
             <div class="flex flex-col py-10 px-4 min-h-0 overflow-y-auto">
@@ -396,7 +583,7 @@ export const DashboardBody: Component<{
                         <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Add another user to the organization</p>
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
-                        <AddMemberForm orgId={org.id} onAdd={handleAddMember} />
+                        <AddMemberForm orgId={orgId()} onAdd={handleAddMember} />
                     </div>
                 </div>
 
@@ -408,7 +595,7 @@ export const DashboardBody: Component<{
                         <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Register a new asset for the organization</p>
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
-                        <AddAssetForm orgId={org.id} onAdd={handleAddAsset} />
+                        <AddAssetForm orgId={orgId()} onAdd={handleAddAsset} />
                     </div>
                 </div>
 
@@ -420,7 +607,7 @@ export const DashboardBody: Component<{
                         <p class="font-mono text-xs text-text/40 tracking-wide mt-1">Bulk-add assets after the organization is created</p>
                     </div>
                     <div class="border border-text/8 rounded-sm p-6 bg-surface">
-                        <AddAssetsCsvForm orgId={org.id} onAddCsv={handleAddAssetsCsv} />
+                        <AddAssetsCsvForm orgId={orgId()} onAddCsv={handleAddAssetsCsv} />
                     </div>
                 </div>
 

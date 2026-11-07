@@ -4,8 +4,9 @@ import { AppHeader } from '@/components/AppHeader';
 import { backendRequest, getToken } from '@/functional/utils';
 import {
     OrganizationAssetData,
-    OrganizationInterfaceData,
     OrganizationMemberData,
+    OrganizationMetaData,
+    PaginatedMembersData,
 } from '@/admin/organizations/functional/types';
 import {
     QL800_LABEL_HEIGHT_IN,
@@ -112,7 +113,9 @@ const PrintQrPage: Component = () => {
         navigate('/login/', { replace: true });
     }
 
-    const [data, setData] = createSignal<OrganizationInterfaceData | null>(null);
+    const [meta, setMeta] = createSignal<OrganizationMetaData | null>(null);
+    const [memberData, setMemberData] = createSignal<OrganizationMemberData[]>([]);
+    const [assetData, setAssetData] = createSignal<OrganizationAssetData[]>([]);
     const [loading, setLoading] = createSignal(true);
     const [error, setError] = createSignal('');
     const [kind, setKind] = createSignal<Kind>('members');
@@ -122,8 +125,14 @@ const PrintQrPage: Component = () => {
 
     onMount(async () => {
         try {
-            const next = await backendRequest<OrganizationInterfaceData>('GET', '/api/admin/dashboard', tok!);
-            setData(next);
+            const [orgMeta, membersPage, assets] = await Promise.all([
+                backendRequest<OrganizationMetaData>('GET', '/api/admin/dashboard', tok!),
+                backendRequest<PaginatedMembersData>('GET', '/api/admin/members/all', tok!),
+                backendRequest<OrganizationAssetData[]>('GET', '/api/admin/assets/all', tok!),
+            ]);
+            setMeta(orgMeta);
+            setMemberData(membersPage.items);
+            setAssetData(assets);
             // Default: nothing selected — user chooses what to print
             setSelected({});
         } catch (e: any) {
@@ -134,8 +143,8 @@ const PrintQrPage: Component = () => {
         }
     });
 
-    const members = createMemo(() => memberItems(data()?.users ?? []));
-    const assets = createMemo(() => assetItems(data()?.assets ?? []));
+    const members = createMemo(() => memberItems(memberData()));
+    const assets = createMemo(() => assetItems(assetData()));
     const catalog = createMemo(() => (kind() === 'members' ? members() : assets()));
 
     const filtered = createMemo(() => {
@@ -394,7 +403,7 @@ const PrintQrPage: Component = () => {
                 </div>
             </Show>
 
-            <Show when={!loading() && !error() && data()}>
+            <Show when={!loading() && !error() && meta()}>
                 <div class="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(280px,380px)_1fr] min-h-0">
                     {/* Selection panel */}
                     <div class="no-print flex flex-col border-r border-text/8 min-h-0 max-h-[calc(100vh-5rem)]">
@@ -402,7 +411,7 @@ const PrintQrPage: Component = () => {
                             <div class="flex items-center justify-between gap-3">
                                 <div class="flex flex-col gap-0.5 min-w-0">
                                     <span class="font-mono font-bold text-sm tracking-widest uppercase truncate">
-                                        {data()!.name}
+                                        {meta()!.name}
                                     </span>
                                     <span class="font-mono text-xs text-text/35 tracking-wide">
                                         {selectedItems().length} selected · {pages().length || 0}{' '}
