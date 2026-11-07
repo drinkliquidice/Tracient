@@ -1,5 +1,5 @@
 import { backendRequest, getToken } from "@/functional/utils";
-import { compareByLastName } from "@/functional/names";
+import { compareByLastName, formatLastFirst } from "@/functional/names";
 import { compareByAssetCode } from "@/functional/assetCodes";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import {
@@ -65,16 +65,12 @@ const isInCenter = (member: OrganizationMemberData): boolean => {
     return new Date(signInTime) > new Date(signOutTime);
 };
 
-const includesQuery = (value: string | null | undefined, q: string): boolean =>
-    (value ?? '').toLowerCase().includes(q);
-
 const memberMatchesQuery = (member: OrganizationMemberData, q: string): boolean => {
     if (!q) return true;
-    if (includesQuery(member.name, q)) return true;
-    return (member.contacts ?? []).some(c =>
-        includesQuery(c.name, q) ||
-        includesQuery(c.email, q) ||
-        includesQuery(c.contactNumber, q)
+    const name = member.name ?? '';
+    return (
+        name.toLowerCase().includes(q) ||
+        formatLastFirst(name).toLowerCase().includes(q)
     );
 };
 

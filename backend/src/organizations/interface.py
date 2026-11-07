@@ -295,18 +295,10 @@ async def _load_org_members(org: OrganizationDocument) -> list[MemberUser]:
 
 
 def _member_matches_query(member: MemberUser, q: str) -> bool:
+    """Match student/member name only — ignore parent/contact fields."""
     if not q:
         return True
-    if q in member.name.casefold():
-        return True
-    for contact in member.resolved_contacts():
-        if (
-            q in contact.name.casefold()
-            or q in contact.email.casefold()
-            or q in contact.contact_number.casefold()
-        ):
-            return True
-    return False
+    return q in (member.name or "").casefold()
 
 
 def _paginate(items: list, page: int, limit: int) -> tuple[list, int, int, int]:

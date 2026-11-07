@@ -147,11 +147,10 @@ const CheckInBody: Component<{
         return members.filter(m => {
             if (letterFilter && lastNameLetter(m.name) !== letterFilter) return false;
             if (!q) return true;
-            if ((m.name ?? '').toLowerCase().includes(q)) return true;
-            return (m.contacts ?? []).some(c =>
-                (c.name ?? '').toLowerCase().includes(q) ||
-                (c.email ?? '').toLowerCase().includes(q) ||
-                (c.contactNumber ?? '').toLowerCase().includes(q)
+            const name = m.name ?? '';
+            return (
+                name.toLowerCase().includes(q) ||
+                formatLastFirst(name).toLowerCase().includes(q)
             );
         });
     });
