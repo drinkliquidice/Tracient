@@ -10,6 +10,7 @@ from src.users.attendance import (
     eastern_date,
     eastern_now,
     is_signed_in,
+    scan_cooldown_remaining,
     settle_day_rollover,
 )
 from src.notifs.twillo import send_sms
@@ -118,7 +119,15 @@ async def member_tap(
 
     now = eastern_now()
 
+    # QR toggle path only — manual dashboard passes action=in|out explicitly
     if action is None:
+        remaining = scan_cooldown_remaining(member, now)
+        if remaining is not None:
+            minutes = max(1, int((remaining.total_seconds() + 59) // 60))
+            raise HTTPException(
+                HTTPStatus.TOO_MANY_REQUESTS,
+                detail=f"Please wait {minutes} more minute{'s' if minutes != 1 else ''} before scanning this code again",
+            )
         action = "out" if is_signed_in(member) else "in"
 
     _enforce_once_per_day(member, action, now)

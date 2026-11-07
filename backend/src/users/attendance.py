@@ -9,6 +9,7 @@ from src.users.datadef import MemberUser
 from utils import ensure_aware_utc
 
 TZ = ZoneInfo("America/New_York")
+SCAN_COOLDOWN = timedelta(minutes=15)
 
 
 def eastern_now() -> datetime:
@@ -70,3 +71,28 @@ async def settle_day_rollover(
             await member.save()
             updated += 1
     return updated
+
+
+def last_attendance_action_time(member: MemberUser) -> datetime | None:
+    times = [t for t in (member.sign_in_time, member.sign_out_time) if t is not None]
+    if not times:
+        return None
+    return max(times, key=to_eastern)
+
+
+def scan_cooldown_remaining(
+    member: MemberUser,
+    now: datetime | None = None,
+) -> timedelta | None:
+    """
+    Time left before the same member QR may be scanned again.
+    Returns None when scanning is allowed.
+    """
+    now = now or eastern_now()
+    last = last_attendance_action_time(member)
+    if last is None:
+        return None
+    elapsed = now - to_eastern(last)
+    if elapsed >= SCAN_COOLDOWN:
+        return None
+    return SCAN_COOLDOWN - elapsed
