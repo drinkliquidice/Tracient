@@ -14,6 +14,7 @@ import { useNavigate } from '@solidjs/router';
 
 import { backendRequest, getToken } from '@/functional/utils';
 import { formatLastFirst, lastNameLetter } from '@/functional/names';
+import { isMemberSignedIn } from '@/functional/attendance';
 import { formatEasternTime, isEasternToday } from '@/functional/time';
 import {
     OrganizationMemberData,
@@ -35,12 +36,7 @@ const NoOrganizationView: Component = () => (
     </div>
 );
 
-const isSignedIn = (member: OrganizationMemberData): boolean => {
-    const { signInTime, signOutTime } = member;
-    if (!signInTime) return false;
-    if (!signOutTime) return true;
-    return new Date(signInTime) > new Date(signOutTime);
-};
+const isSignedIn = isMemberSignedIn;
 
 const formatActivity = (member: OrganizationMemberData): string => {
     const { signInTime, signOutTime } = member;

@@ -10,6 +10,7 @@ import {
 } from "@/admin/organizations/functional/types";
 import { cleanedContacts, ContactCarousel, contactsAreComplete } from "./contacts";
 import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/functional/qr";
+import { isMemberSignedIn } from "@/functional/attendance";
 import { formatLastFirst } from "@/functional/names";
 import { formatEasternDate } from "@/functional/time";
 
@@ -272,12 +273,7 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
 
     const formatDate = (date: Date) => formatEasternDate(date);
 
-    const isOnline = () => {
-        const { signInTime, signOutTime } = props.member;
-        if (!signInTime) return false;
-        if (!signOutTime) return true;
-        return new Date(signInTime) > new Date(signOutTime);
-    };
+    const isOnline = () => isMemberSignedIn(props.member);
 
     return (
         <div
