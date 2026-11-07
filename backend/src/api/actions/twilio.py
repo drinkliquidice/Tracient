@@ -1,41 +1,30 @@
-from datetime import date, datetime
+from datetime import datetime
 import asyncio
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from http import HTTPStatus
 from beanie.odm.fields import PydanticObjectId
-from zoneinfo import ZoneInfo
 
 from src.users.datadef import MemberUser
+from src.users.attendance import (
+    eastern_date,
+    eastern_now,
+    is_signed_in,
+    settle_day_rollover,
+)
 from src.notifs.twillo import send_sms
 from src.notifs.email import email_configured, send_email
-from utils import ensure_aware_utc, to_iso_eastern
+from utils import to_iso_eastern
 
 logger = logging.getLogger(__name__)
 
 twilio_actions_router = APIRouter()
 
-TZ = ZoneInfo("America/New_York")
-
-
-def _is_signed_in(member: MemberUser) -> bool:
-    sign_in = member.sign_in_time
-    sign_out = member.sign_out_time
-    if sign_in is None:
-        return False
-    if sign_out is None:
-        return True
-    return sign_in > sign_out
-
-
-def _eastern_date(dt: datetime) -> date:
-    return ensure_aware_utc(dt).astimezone(TZ).date()
-
 
 def _happened_today(dt: datetime | None, now: datetime) -> bool:
     if dt is None:
         return False
-    return _eastern_date(dt) == _eastern_date(now)
+    return eastern_date(dt) == eastern_date(now)
 
 
 def _apply_action(member: MemberUser, action: str, now: datetime) -> None:
@@ -114,10 +103,13 @@ async def member_tap(
     if action is not None and action not in ("in", "out"):
         raise HTTPException(HTTPStatus.BAD_REQUEST, detail="action must be 'in' or 'out'")
 
-    now = datetime.now(TZ)
+    # Close any session that crossed midnight before applying today's action
+    await settle_day_rollover([member])
+
+    now = eastern_now()
 
     if action is None:
-        action = "out" if _is_signed_in(member) else "in"
+        action = "out" if is_signed_in(member) else "in"
 
     _enforce_once_per_day(member, action, now)
     _apply_action(member, action, now)

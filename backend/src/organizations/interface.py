@@ -12,6 +12,7 @@ from utils import APIResponseModel, EasternDateTime
 from src.admin.datadef import AdminUser
 from src.organizations.datadef import OrganizationDocument
 from src.users.datadef import MemberUser
+from src.users.attendance import is_signed_in, settle_day_rollover
 from src.assets.datadef import AssetDocument, AssetGroupDocument
 from src.assets.groups import (
     load_copies_by_group,
@@ -123,16 +124,6 @@ def compare_by_last_name(a: MemberUser, b: MemberUser) -> int:
     if fa == fb:
         return 0
     return -1 if fa < fb else 1
-
-
-def is_signed_in(member: MemberUser) -> bool:
-    sign_in = member.sign_in_time
-    sign_out = member.sign_out_time
-    if sign_in is None:
-        return False
-    if sign_out is None:
-        return True
-    return sign_in > sign_out
 
 
 def _member_contacts(member_doc: MemberUser) -> list[MemberContactData]:
@@ -321,6 +312,7 @@ async def list_members(
 ) -> PaginatedMembersData:
     org = await require_org(user)
     members = await _load_org_members(org)
+    await settle_day_rollover(members)
     members.sort(key=lambda m: (_parse_last_name(m.name).casefold(), m.name.casefold()))
 
     in_center_count = sum(1 for m in members if is_signed_in(m))
@@ -358,6 +350,7 @@ async def get_member_detail(user: AdminUser, member_id: str) -> OrganizationMemb
     member = await MemberUser.get(oid)
     if member is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, detail="Member not found")
+    await settle_day_rollover([member])
     return await member_to_interface(member)
 
 
