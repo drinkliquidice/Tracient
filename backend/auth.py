@@ -7,8 +7,8 @@ from settings import settings
 
 from src.admin.datadef import AdminUser
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-REFRESH_TOKEN_EXPIRE_DAYS = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12  # 12 hours; refresh keeps sessions longer
+REFRESH_TOKEN_EXPIRE_DAYS = 90
 
 bearer_scheme = HTTPBearer()
 

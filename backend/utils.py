@@ -1,8 +1,33 @@
+from datetime import datetime, timezone
+from typing import Annotated
+from zoneinfo import ZoneInfo
+
 from bson import ObjectId
 from bson.errors import InvalidId
-from pydantic import BaseModel, ConfigDict, AliasGenerator, GetCoreSchemaHandler
+from pydantic import BaseModel, ConfigDict, AliasGenerator, GetCoreSchemaHandler, PlainSerializer
 from pydantic.alias_generators import to_camel
 from pydantic_core import core_schema
+
+EASTERN = ZoneInfo("America/New_York")
+
+
+def ensure_aware_utc(dt: datetime) -> datetime:
+    """Mongo often returns naive UTC — treat naive values as UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def to_iso_eastern(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    return ensure_aware_utc(dt).astimezone(EASTERN).isoformat()
+
+
+EasternDateTime = Annotated[
+    datetime,
+    PlainSerializer(lambda dt: to_iso_eastern(dt) or "", return_type=str, when_used="json"),
+]
 
 
 class APIRequestModel(BaseModel):

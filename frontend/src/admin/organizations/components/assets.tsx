@@ -8,12 +8,13 @@ import {
 } from "@/admin/organizations/functional/types";
 import { openQrImageTab, openAssetQrSheet, qrCodeUrl } from "@/admin/organizations/functional/qr";
 import { formatAssetQrLabel } from "@/functional/assetCodes";
+import { formatLastFirst } from "@/functional/names";
+import { formatEasternDate } from "@/functional/time";
 
 const formatDate = (date: Date | string | null) => {
     if (!date) return '—';
-    const d = date instanceof Date ? date : new Date(date);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+    const formatted = formatEasternDate(date);
+    return formatted || '—';
 };
 
 const CopyRow: Component<{
@@ -21,6 +22,8 @@ const CopyRow: Component<{
     index: number;
     assetCode: string;
     copyCount: number;
+    checkingIn?: boolean;
+    onCheckIn?: () => void;
 }> = (props) => {
     const qrPayload = () => props.copy.endpoint || props.copy.id;
     const qrUrl = () => qrCodeUrl(qrPayload(), 200);
@@ -58,14 +61,34 @@ const CopyRow: Component<{
                     <span>Out {formatDate(props.copy.checkOutTime)}</span>
                     <span>In {formatDate(props.copy.checkInTime)}</span>
                 </div>
+                <Show when={props.copy.checkedOut && props.copy.borrowedByMemberName}>
+                    <span class="font-mono text-[10px] text-text/40 tracking-wide truncate">
+                        With {formatLastFirst(props.copy.borrowedByMemberName!)}
+                    </span>
+                </Show>
             </div>
-            <button
-                type="button"
-                class="shrink-0 px-2.5 py-1.5 border border-text/10 rounded-sm font-mono text-[10px] tracking-widest uppercase text-text/50 hover:text-text hover:border-accent/40 transition-colors"
-                onClick={() => openQrImageTab(qrPayload(), label())}
-            >
-                PNG
-            </button>
+            <div class="flex flex-col gap-1.5 shrink-0">
+                <Show when={props.copy.checkedOut && props.onCheckIn}>
+                    <button
+                        type="button"
+                        class="px-2.5 py-1.5 border border-blue-400/30 rounded-sm font-mono text-[10px] tracking-widest uppercase text-blue-400 hover:bg-blue-400/10 transition-colors disabled:opacity-40 flex items-center justify-center min-w-16"
+                        onClick={props.onCheckIn}
+                        disabled={props.checkingIn}
+                    >
+                        {props.checkingIn
+                            ? <span class="w-3 h-3 border-2 border-blue-400/20 border-t-blue-400 rounded-full animate-spin" />
+                            : 'Check In'
+                        }
+                    </button>
+                </Show>
+                <button
+                    type="button"
+                    class="px-2.5 py-1.5 border border-text/10 rounded-sm font-mono text-[10px] tracking-widest uppercase text-text/50 hover:text-text hover:border-accent/40 transition-colors"
+                    onClick={() => openQrImageTab(qrPayload(), label())}
+                >
+                    PNG
+                </button>
+            </div>
         </div>
     );
 };
@@ -74,6 +97,7 @@ export const AssetModal: Component<{
     asset: OrganizationAssetData;
     onClose: () => void;
     onSave: (updated: Pick<OrganizationAssetEditForm, 'name' | 'assetCode' | 'totalQuantity' | 'deleteAsset'>) => Promise<void>;
+    onCheckInCopy?: (copyId: string) => Promise<void>;
 }> = (props) => {
     const [name, setName] = createSignal(props.asset.name);
     const [assetCode, setAssetCode] = createSignal(props.asset.assetCode);
@@ -82,6 +106,8 @@ export const AssetModal: Component<{
     const [saving, setSaving] = createSignal(false);
     const [saveError, setSaveError] = createSignal('');
     const [saveSuccess, setSaveSuccess] = createSignal(false);
+    const [checkingInCopyId, setCheckingInCopyId] = createSignal<string | null>(null);
+    const [checkInError, setCheckInError] = createSignal('');
 
     createEffect((prevId?: string) => {
         const id = props.asset.id;
@@ -92,11 +118,26 @@ export const AssetModal: Component<{
             setDeleteAsset(false);
             setSaveError('');
             setSaveSuccess(false);
+            setCheckingInCopyId(null);
+            setCheckInError('');
         }
         return id;
     });
 
     const copies = () => props.asset.copies ?? [];
+
+    const handleCheckIn = async (copyId: string) => {
+        if (!props.onCheckInCopy || checkingInCopyId()) return;
+        setCheckingInCopyId(copyId);
+        setCheckInError('');
+        try {
+            await props.onCheckInCopy(copyId);
+        } catch (e: any) {
+            setCheckInError(e?.message ?? 'Check in failed.');
+        } finally {
+            setCheckingInCopyId(null);
+        }
+    };
 
     const dirty = () =>
         name() !== props.asset.name ||
@@ -277,6 +318,9 @@ export const AssetModal: Component<{
                                 Print All QRs
                             </button>
                         </div>
+                        <Show when={checkInError()}>
+                            <p class="font-mono text-xs text-red-400/80 tracking-wide shrink-0">{checkInError()}</p>
+                        </Show>
                         <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-2">
                             <Show
                                 when={copies().length > 0}
@@ -293,6 +337,12 @@ export const AssetModal: Component<{
                                             index={index()}
                                             assetCode={props.asset.assetCode}
                                             copyCount={copies().length}
+                                            checkingIn={checkingInCopyId() === copy.id}
+                                            onCheckIn={
+                                                props.onCheckInCopy && copy.checkedOut
+                                                    ? () => void handleCheckIn(copy.id)
+                                                    : undefined
+                                            }
                                         />
                                     )}
                                 </For>

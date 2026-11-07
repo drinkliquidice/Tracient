@@ -81,6 +81,17 @@ export const compareByAssetCode = (
     });
 };
 
+/** Kumon level from an asset code: "7A-01" → "7A", "A-03" → "A". */
+export const assetLevelLabel = (code: string): string => {
+    const parsed = parseAssetCode(code);
+    if (parsed.band === 0) return `${parsed.levelNum}${parsed.levelLetters}`;
+    return parsed.levelLetters || parsed.raw.toUpperCase() || '#';
+};
+
+/** Sort level labels with the same Kumon ordering as asset codes. */
+export const compareAssetLevels = (a: string, b: string): number =>
+    compareByAssetCode({ assetCode: a }, { assetCode: b });
+
 /** Label under an asset QR: code, with #n when there are multiple copies. */
 export const formatAssetQrLabel = (
     assetCode: string,

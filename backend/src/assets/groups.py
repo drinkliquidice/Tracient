@@ -1,18 +1,41 @@
 from __future__ import annotations
 
 from beanie import PydanticObjectId
+from beanie.operators import In
 
 from src.assets.datadef import AssetDocument, AssetGroupDocument
 from src.organizations.datadef import OrganizationDocument
 
 
+async def load_copies_for_ids(asset_ids: list[PydanticObjectId]) -> list[AssetDocument]:
+    """Batch-load asset copies, preserving the order of asset_ids."""
+    if not asset_ids:
+        return []
+    docs = await AssetDocument.find(In(AssetDocument.id, list(asset_ids))).to_list()
+    by_id = {doc.id: doc for doc in docs}
+    return [by_id[asset_id] for asset_id in asset_ids if asset_id in by_id]
+
+
 async def load_group_copies(group: AssetGroupDocument) -> list[AssetDocument]:
-    copies: list[AssetDocument] = []
-    for asset_id in group.assets:
-        asset = await AssetDocument.get(asset_id)
-        if asset is not None:
-            copies.append(asset)
-    return copies
+    return await load_copies_for_ids(list(group.assets or []))
+
+
+async def load_copies_by_group(
+    groups: list[AssetGroupDocument],
+) -> dict[PydanticObjectId, list[AssetDocument]]:
+    """One query for all copies across groups, keyed by group id."""
+    all_ids: list[PydanticObjectId] = []
+    for group in groups:
+        all_ids.extend(group.assets or [])
+    if not all_ids:
+        return {group.id: [] for group in groups}
+
+    docs = await AssetDocument.find(In(AssetDocument.id, all_ids)).to_list()
+    by_id = {doc.id: doc for doc in docs}
+    return {
+        group.id: [by_id[aid] for aid in (group.assets or []) if aid in by_id]
+        for group in groups
+    }
 
 
 async def migrate_legacy_asset(
@@ -108,3 +131,52 @@ async def find_group_for_asset(
     if org is not None and asset.is_legacy() and asset.id in org.assets:
         return await migrate_legacy_asset(org, asset)
     return None
+
+
+async def resolve_org_asset_groups_batch(
+    org: OrganizationDocument,
+) -> tuple[list[AssetGroupDocument], bool]:
+    """
+    Resolve all org.assets entries as groups (migrating legacy as needed).
+    Returns (groups_in_org_order, org_was_mutated).
+    """
+    asset_ids = list(org.assets or [])
+    if not asset_ids:
+        return [], False
+
+    found = await AssetGroupDocument.find(In(AssetGroupDocument.id, asset_ids)).to_list()
+    by_id = {group.id: group for group in found}
+
+    groups: list[AssetGroupDocument] = []
+    resolved_ids: list[PydanticObjectId] = []
+    mutated = False
+
+    for asset_id in asset_ids:
+        group = by_id.get(asset_id)
+        if group is not None:
+            groups.append(group)
+            resolved_ids.append(group.id)
+            continue
+        # Missing as a group — may be legacy asset needing migration, or a dangling id.
+        try:
+            group = await resolve_org_asset_group(org, asset_id)
+        except Exception:
+            mutated = True
+            continue
+        if group is None:
+            mutated = True
+            continue
+        if group.id != asset_id:
+            mutated = True
+        groups.append(group)
+        resolved_ids.append(group.id)
+
+    if list(org.assets or []) != resolved_ids:
+        org.assets = resolved_ids
+        try:
+            await org.save()
+            mutated = True
+        except Exception:
+            pass
+
+    return groups, mutated

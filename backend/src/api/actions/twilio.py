@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import asyncio
 import logging
 from fastapi import APIRouter, HTTPException, Query
@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from src.users.datadef import MemberUser
 from src.notifs.twillo import send_sms
 from src.notifs.email import email_configured, send_email
+from utils import ensure_aware_utc, to_iso_eastern
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,16 @@ def _is_signed_in(member: MemberUser) -> bool:
     return sign_in > sign_out
 
 
+def _eastern_date(dt: datetime) -> date:
+    return ensure_aware_utc(dt).astimezone(TZ).date()
+
+
+def _happened_today(dt: datetime | None, now: datetime) -> bool:
+    if dt is None:
+        return False
+    return _eastern_date(dt) == _eastern_date(now)
+
+
 def _apply_action(member: MemberUser, action: str, now: datetime) -> None:
     if action == "in":
         member.sign_in_time = now
@@ -35,19 +46,36 @@ def _apply_action(member: MemberUser, action: str, now: datetime) -> None:
         member.sign_out_time = now
 
 
-async def _notify_sign_out(member: MemberUser, now: datetime) -> None:
+def _enforce_once_per_day(member: MemberUser, action: str, now: datetime) -> None:
+    """Members may sign in once and sign out once per Eastern calendar day."""
+    if action == "in" and _happened_today(member.sign_in_time, now):
+        raise HTTPException(
+            HTTPStatus.CONFLICT,
+            detail="Already signed in today",
+        )
+    if action == "out" and _happened_today(member.sign_out_time, now):
+        raise HTTPException(
+            HTTPStatus.CONFLICT,
+            detail="Already signed out today",
+        )
+
+
+async def _notify_sign_action(member: MemberUser, action: str, now: datetime) -> None:
+    if action not in ("in", "out"):
+        return
     if not (member.sms_enabled() or member.email_enabled()):
         return
 
+    label = "IN" if action == "in" else "OUT"
     timestamp = now.strftime("%I:%M %p")
-    sms_body = f"Hi {{greeting}}, {member.name} has signed OUT at {timestamp}."
+    sms_body = f"Hi {{greeting}}, {member.name} has signed {label} at {timestamp}."
     email_body = (
         f"Hi {{greeting}},\n\n"
-        f"{member.name} has signed OUT at {timestamp}.\n"
+        f"{member.name} has signed {label} at {timestamp}.\n"
     )
     can_email = email_configured()
     if member.email_enabled() and not can_email:
-        logger.warning("SendGrid is not configured; sign-out emails will be skipped")
+        logger.warning("SendGrid is not configured; sign-%s emails will be skipped", action)
 
     for contact in member.resolved_contacts():
         greeting = contact.name.strip() or "there"
@@ -67,7 +95,7 @@ async def _notify_sign_out(member: MemberUser, now: datetime) -> None:
                 await asyncio.to_thread(
                     send_email,
                     to=email,
-                    subject=f"{member.name} signed OUT",
+                    subject=f"{member.name} signed {label}",
                     body=email_body.format(greeting=greeting),
                 )
             except Exception as e:
@@ -91,17 +119,17 @@ async def member_tap(
     if action is None:
         action = "out" if _is_signed_in(member) else "in"
 
+    _enforce_once_per_day(member, action, now)
     _apply_action(member, action, now)
     await member.save()
 
-    if action == "out":
-        await _notify_sign_out(member, now)
+    await _notify_sign_action(member, action, now)
 
     return {
         "member": member.name,
         "action": action,
-        "timestamp": now.isoformat(),
-        "signInTime": member.sign_in_time.isoformat() if member.sign_in_time else None,
-        "signOutTime": member.sign_out_time.isoformat() if member.sign_out_time else None,
-        "lastSignIn": member.last_signed_in.isoformat() if member.last_signed_in else None,
+        "timestamp": to_iso_eastern(now),
+        "signInTime": to_iso_eastern(member.sign_in_time),
+        "signOutTime": to_iso_eastern(member.sign_out_time),
+        "lastSignIn": to_iso_eastern(member.last_signed_in),
     }

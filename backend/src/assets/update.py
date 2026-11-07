@@ -5,10 +5,10 @@ logger = logging.getLogger(__name__)
 from fastapi import HTTPException
 from utils import APIRequestModel
 from src.assets.datadef import AssetDocument, AssetGroupDocument
-from src.assets.create import assert_asset_code_available, group_to_interface
+from src.assets.create import assert_asset_code_available
 from src.assets.groups import load_group_copies, resolve_org_asset_group
 from src.organizations.datadef import OrganizationDocument
-from src.organizations.interface import OrganizationAssetData
+from src.organizations.interface import OrganizationAssetData, group_to_interface
 
 
 class UpdateAssetForm(APIRequestModel):

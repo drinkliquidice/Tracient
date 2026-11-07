@@ -11,6 +11,7 @@ import {
 import { cleanedContacts, ContactCarousel, contactsAreComplete } from "./contacts";
 import { openQrImageTab, qrCodeUrl, QR_SIDE_CM } from "@/admin/organizations/functional/qr";
 import { formatLastFirst } from "@/functional/names";
+import { formatEasternDate } from "@/functional/time";
 
 const CheckRow: Component<{
     checked: boolean;
@@ -269,8 +270,7 @@ export const MemberCard: Component<{ member: OrganizationMemberData; onClick: ()
         return i >= o ? { date: i, label: 'In' } : { date: o, label: 'Out' };
     };
 
-    const formatDate = (date: Date) =>
-        date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+    const formatDate = (date: Date) => formatEasternDate(date);
 
     const isOnline = () => {
         const { signInTime, signOutTime } = props.member;
